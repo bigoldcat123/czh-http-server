@@ -1,3 +1,8 @@
+//!
+//! # czh_http_server
+//! 
+//! czh_http_server is a simple http server
+//!
 use std::{cell::RefCell, net::TcpStream, ops::DerefMut, rc::Rc};
 
 use request::HttpRequest;
