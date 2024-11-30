@@ -8,8 +8,13 @@ pub struct Controller {
 
 impl Controller {
     pub fn new() -> Self {
+        let mothers = ["GET", "POST", "DELETE", "OPTIONS","PUT","PATCH","HEAD","TRACE","CONNECT"];
+        let mut handlers = HashMap::with_capacity(mothers.len());
+        for method in mothers {
+            handlers.insert(method.to_string(), HashMap::new());
+        }
         Controller {
-            handlers: HashMap::new()
+            handlers
         }
     }
     pub fn handle_request(&self,request:HttpRequest,response:HttpResponse) {
