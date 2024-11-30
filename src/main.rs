@@ -1,18 +1,9 @@
-use std::net::TcpListener;
 
-use czh_http_server::handle_stream;
+use czh_http_server::HttpServer;
 
 fn main() {
-    let server = TcpListener::bind("localhost:8888").unwrap();
-    println!("listen at {}", 8888);
-    for client in server.incoming() {
-        match client {
-            Ok(stream) => {
-                handle_stream(stream);
-            }
-            Err(_) => {
-                println!("Something wrong!")
-            }
-        }
-    }
+    let server  = HttpServer::create_server("localhost", 3000);
+
+    server.listen();
+    
 }
