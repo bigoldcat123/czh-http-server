@@ -47,8 +47,34 @@ impl HttpRequest {
             stream: Some(stream.clone()),
         }
     }
+    pub fn headers (&self) -> &HashMap<String, String> {
+        &self.headers
+    }
     pub  fn version(&self) -> &str {
         &self.status_line.version
+    }
+    
+    pub fn method(&self) -> &str {
+        self.status_line.method.as_str()
+    }
+    
+    pub fn url(&self) -> &str {
+        self.status_line.url.as_str()
+    }
+    
+    pub(crate) fn prefix_url(&self) -> &str {
+        let mut stop = 1;
+        for i in 1..self.url().len() {
+            if self.url().as_bytes()[i] == b'/' {
+                stop = i;
+                break;
+            }
+        }
+        if stop == 1 {
+            self.url()
+        } else {
+            &self.url()[0..stop]
+        }
     }
 }
 fn parse_request_row(reader: &mut BufReader<&mut TcpStream>) -> Result<(String, String, String)> {
@@ -65,5 +91,14 @@ fn parse_request_row(reader: &mut BufReader<&mut TcpStream>) -> Result<(String, 
         url.push_str(row[1]);
         version.push_str(row[2]);
         Ok((method, url, version))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::HttpRequest;
+
+    #[test]
+    fn it_works() {
     }
 }
