@@ -25,7 +25,7 @@ impl Controller {
         }
     }
     pub fn handle_not_found(&self, request: HttpRequest, response: HttpResponse) {
-        response.json("GGG");
+        response.json("404 NOT FOUND!!😭");
     }
     pub fn handle_request(&self, request: HttpRequest, response: HttpResponse) {
         if let Some(handler) = self.static_handlers.get(request.prefix_url()) {

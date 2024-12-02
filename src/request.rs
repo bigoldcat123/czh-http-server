@@ -87,8 +87,9 @@ fn parse_request_row(reader: &mut BufReader<&mut TcpStream>) -> Result<(String, 
     if row.len() != 3 {
         Err(Error::new(std::io::ErrorKind::Other, "error"))
     } else {
+        let u: Vec<&str> = row[1].split("?").collect();
         method.push_str(row[0]);
-        url.push_str(row[1]);
+        url.push_str(u[0]);
         version.push_str(row[2]);
         Ok((method, url, version))
     }

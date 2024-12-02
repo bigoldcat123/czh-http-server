@@ -101,6 +101,8 @@ pub enum ContentType {
     JS,
     PNG,
     JPG,
+    SVG,
+    TXT,
     OTHER,
 }
 impl From<&str> for ContentType {
@@ -113,6 +115,8 @@ impl From<&str> for ContentType {
             "png" => ContentType::PNG,
             "jpg" => ContentType::JPG,
             "jpeg" => ContentType::JPG,
+            "svg" => ContentType::SVG,
+            "txt" => ContentType::TXT,
             _ => ContentType::OTHER,
         }
     }
@@ -126,6 +130,8 @@ impl Into<String> for ContentType {
             ContentType::JS => "text/javascript".to_string(),
             ContentType::PNG => "image/png".to_string(),
             ContentType::JPG => "image/jpeg".to_string(),
+            ContentType::SVG => "image/svg+xml".to_string(),
+            ContentType::TXT => "text/plain".to_string(),
             ContentType::OTHER => "application/octet-stream".to_string(),
         }
     }

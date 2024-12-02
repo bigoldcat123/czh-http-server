@@ -4,7 +4,12 @@
 //! czh_http_server is a simple http server
 //!
 use std::{
-    cell::RefCell, fs::File, net::{TcpListener, TcpStream}, path::{Path, PathBuf}, rc::Rc, sync::Arc
+    cell::RefCell,
+    fs::File,
+    net::{TcpListener, TcpStream},
+    path::{Path, PathBuf},
+    rc::Rc,
+    sync::Arc,
 };
 
 use controller::Controller;
@@ -65,36 +70,53 @@ impl HttpServer {
     /// the url /path/a would be mapped to /file/a which is a fs path
     pub fn map(&mut self, url: &str, path: &str) {
         let path = path.to_string();
-        self.controller.as_mut().unwrap().add_static_handler(url, move |req,res| {
-            // println!("map {:#?} to ",url,path);
-            println!("map {} to {:#?}",req.url(),path);
-            let root = PathBuf::from(path.as_str());
-            let mut start = 1;
-            loop {
-                if start >= req.url().len() {
-                    break;
-                }
-                if req.url().as_bytes()[start] == b'/' {
+        self.controller
+            .as_mut()
+            .unwrap()
+            .add_static_handler(url, move |req, res| {
+                // println!("map {:#?} to ",url,path);
+                println!("map {} to {:#?}", req.url(), path);
+                let root = PathBuf::from(path.as_str());
+                let mut start = 1;
+                loop {
+                    if start >= req.url().len() {
+                        break;
+                    }
+                    if req.url().as_bytes()[start] == b'/' {
+                        start += 1;
+                        break;
+                    }
                     start += 1;
-                    break;
                 }
-                start += 1;
-            }
-            let path = root.join(req.url()[start..].to_string());
-            println!("{:#?}",path);
-            if let Ok(file) = File::open(&path) {
-                if file.metadata().unwrap().is_dir(){
-                    res.json("404");
-                    return;
-                }else {
-                    let filename = path.file_name().as_ref().unwrap().to_str().unwrap();
-                    let ext = Path::new(filename).extension().unwrap().to_str().unwrap();
-                    res.file(file,ContentType::from(ext));
+                let mut path = root.join(req.url()[start..].to_string());
+                println!("{:#?}", path);
+                if let Ok(file) = File::open(&path) {
+                    // if file.metadata().unwrap().is_dir(){
+                    //     res.json("404");
+                    //     return;
+                    // }else {
+                    //     let filename = path.file_name().as_ref().unwrap().to_str().unwrap();
+                    //     let ext = Path::new(filename).extension().unwrap().to_str().unwrap();
+                    //     res.file(file,ContentType::from(ext));
+                    // }
+                    if file.metadata().unwrap().is_dir() {
+                        path.push("index.html");
+                        if let Ok(file) = File::open(&path) {
+                            let filename = path.file_name().as_ref().unwrap().to_str().unwrap();
+                            let ext = Path::new(filename).extension().unwrap().to_str().unwrap();
+                            res.file(file, ContentType::from(ext));
+                        } else {
+                            res.json("no such file");
+                        }
+                    } else {
+                        let filename = path.file_name().as_ref().unwrap().to_str().unwrap();
+                        let ext = Path::new(filename).extension().unwrap().to_str().unwrap();
+                        res.file(file, ContentType::from(ext));
+                    }
+                } else {
+                    res.json("no such file");
                 }
-            }else {
-                res.json("no such file");
-            }
-        });
+            });
     }
 }
 
