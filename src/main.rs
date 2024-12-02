@@ -1,5 +1,5 @@
 
-use czh_http_server::HttpServer;
+use czh_http_server::{route::Route, HttpHander, HttpServer};
 use serde::{Deserialize, Serialize};
 
 // t==========
@@ -10,12 +10,15 @@ struct Student {
 }
 
 fn main() {
+    
     let mut server  = HttpServer::create_server("localhost", 3000);
     server.map("/file","/Users/dadigua/Desktop/lifetime/app/nextjs-static/dist");
+
     server.get("/home",|req,res| {
         println!("{:#?}",req.url());
         res.json("hello fetch");
     });
+    
     server.post("/post",|mut req,res| {
         match req.json::<Student>() {
             Ok(stu) => {
@@ -30,6 +33,22 @@ fn main() {
         println!("{:#?}",req.url());
         res.json("hello post");
     });
+
+    let mut route = Route::new();
+
+    route.get("/sayhello", |req, res| {
+        // req.url()
+        println!("{:#?}",req.url());
+        res.json(Student{
+            name:"dadigua".to_string(),
+            age:18
+        });
+    });
+
+    server.router("/route",route);
+    
+
+
     server.listen();
     
 }

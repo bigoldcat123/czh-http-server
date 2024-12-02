@@ -6,10 +6,13 @@ use crate::{request::HttpRequest, response::HttpResponse, ControllerHandler};
 
 pub struct Controller {
     static_handlers: HashMap<String, ControllerHandler>,
-    handlers: HashMap<String, HashMap<String, ControllerHandler>>,
+    handlers: Option<HashMap<String, HashMap<String, ControllerHandler>>>,
 }
 
 impl Controller {
+    pub fn take(mut self) -> HashMap<String, HashMap<String, ControllerHandler>> {
+        self.handlers.take().unwrap()
+    }
     pub fn new() -> Self {
         let mothers = [
             "GET", "POST", "DELETE", "OPTIONS", "PUT", "PATCH", "HEAD", "TRACE", "CONNECT",
@@ -20,7 +23,7 @@ impl Controller {
         }
         let static_handlers = HashMap::new();
         Controller {
-            handlers,
+            handlers: Some(handlers),
             static_handlers,
         }
     }
@@ -35,7 +38,7 @@ impl Controller {
             }
         }
 
-        let handlers = self.handlers.get(request.method()).unwrap();
+        let handlers = self.handlers.as_ref().unwrap().get(request.method()).unwrap();
         let handler = match handlers.get(request.url()) {
             Some(handler) => handler,
             None => {
@@ -50,13 +53,14 @@ impl Controller {
         &mut self,
         method: &str,
         url: &str,
-        controller: impl Fn(HttpRequest, HttpResponse) + Sync + Send + 'static,
+        controller: Box<dyn Fn(HttpRequest, HttpResponse) + Sync + Send + 'static>,
     ) {
         let handlers = self
             .handlers
+            .as_mut().unwrap()
             .get_mut(method.to_uppercase().as_str())
             .unwrap();
-        handlers.insert(url.to_string(), Box::new(controller));
+        handlers.insert(url.to_string(), controller);
     }
     pub(crate) fn add_static_handler(
         &mut self,

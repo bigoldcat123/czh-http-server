@@ -39,10 +39,10 @@ impl HttpRequest {
             headers.insert(String::from(key_v.0.trim()), String::from(key_v.1.trim()));
             buffer.clear();
         }
-        
+        //bufReader will preread some date storing in its inner buffer ,so when droping it
+        //,we have to store the buffs that have already been read.        
         let buffer = Vec::from_iter(reader.buffer().iter().map(|x| *x));
-        // println!("{:#?}",);
-        // let buffer = vec![];
+
         Ok(Self {
             status_line: StatusLine {
                 method,
@@ -103,9 +103,7 @@ impl HttpRequest {
                     break;
                 }
             }
-            // serde_json::
             serde_json::from_slice(&self.buffer)
-            // serde_json::from_reader(reader)
         }
     }
     fn get_content_length(&self) -> serde_json::Result<usize> {
