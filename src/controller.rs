@@ -24,7 +24,7 @@ impl Controller {
             static_handlers,
         }
     }
-    pub fn handle_not_found(&self, request: HttpRequest, response: HttpResponse) {
+    pub fn handle_not_found(&self, response: HttpResponse) {
         response.json("404 NOT FOUND!!😭");
     }
     pub fn handle_request(&self, request: HttpRequest, response: HttpResponse) {
@@ -39,7 +39,7 @@ impl Controller {
         let handler = match handlers.get(request.url()) {
             Some(handler) => handler,
             None => {
-                self.handle_not_found(request, response);
+                self.handle_not_found( response);
                 return;
             }
         };

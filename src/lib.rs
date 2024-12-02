@@ -16,8 +16,8 @@ use controller::Controller;
 use request::HttpRequest;
 use response::{ContentType, HttpResponse};
 mod controller;
-mod request;
-mod response;
+pub mod request;
+pub mod response;
 type ControllerHandler = Box<dyn Fn(HttpRequest, HttpResponse) + Sync + Send + 'static>;
 
 pub struct HttpServer {
@@ -37,6 +37,7 @@ impl HttpServer {
         let controller = Arc::new(self.controller.take().unwrap());
         let pool = czhmt::ThreadPool::new(4);
         for client in self.listener.incoming() {
+            print!("hello");
             match client {
                 Ok(stream) => {
                     let controller = controller.clone();
@@ -118,11 +119,29 @@ impl HttpServer {
                 }
             });
     }
+    
+    pub fn post<T>(&mut self, url: &str, controller: T)
+    where
+        T: Fn(HttpRequest, HttpResponse) + Sync + Send + 'static,
+    {
+        self.controller
+            .as_mut()
+            .unwrap()
+            .add_handler("POST", url, controller);
+    }
 }
 
 pub fn handle_stream(stream: TcpStream, controller: Arc<Controller>) {
     let rc = Rc::new(RefCell::new(stream));
-    let request = HttpRequest::build(rc.clone());
+    let request = match HttpRequest::build(rc.clone()) {
+        Ok(req) => req,
+        Err(e) => {
+            println!("Error: {}", e);
+            let response = HttpResponse::init(rc.clone(), "HTTP/1.1");
+            controller.handle_not_found(response);
+            return;
+        }
+    };
     let response = HttpResponse::init(rc.clone(), request.version());
     controller.handle_request(request, response);
 }
