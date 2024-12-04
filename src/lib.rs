@@ -2,6 +2,60 @@
 //! # czh_http_server
 //!
 //! czh_http_server is a simple http server
+//! # Example
+//! ```
+//! let mut server  = HttpServer::create_server("localhost", 3000);
+//!    // server.listen();
+//!    server.filter("/home",|req,res| {
+//!        println!("{:#?}","hello i am filterb");
+//!        if req.url() == "/home/abc" {
+//!            res.json("GLALALALALALA");
+//!            return None
+//!        }
+//!        Some((req,res))
+//!    });
+//!    server.map("/file","/Users/dadigua/Desktop/lifetime/app/nextjs-static/dist");
+//!
+//!    server.get("/home",|req,mut res| {
+//!        println!("{:#?}",req.url());
+//!        // println!("{:#?}",req.headers());
+//!        println!("{:#?}",req.cookies());
+//!        res.set_cookie("cooooooo", "this is cookie setted by server");
+//!        res.json("hello fetch");
+//!    });
+//!    server.get("/home/abc",|req,res| {
+//!        println!("{:#?}",req.url());
+//!        res.json("hello fetch/ home/abc");
+//!    });
+//!    
+//!    server.post("/post",|mut req,res| {
+//!        match req.json::<Student>() {
+//!            Ok(stu) => {
+//!                println!("{:#?}",stu);
+//!            },
+//!            Err(_) => {
+//!                res.json("error parse json");
+//!                return;
+//!            },
+//!        }
+//!        println!("{:#?}",req.url());
+//!        res.json("hello post");
+//!    });
+//!
+//!    let mut route = Route::new();
+//!
+//!    route.get("/sayhello", |req, res| {
+//!        // req.url()
+//!        println!("{:#?}",req.url());
+//!        res.json(Student{
+//!            name:"dadigua".to_string(),
+//!            age:18
+//!        });
+//!    });
+//!
+//!    server.router("/route",route);
+//!    server.listen();
+//! ```
 //!
 use std::{
     cell::RefCell, fs::File, mem, net::{TcpListener, TcpStream}, path::{Path, PathBuf}, rc::Rc, sync::Arc
@@ -29,7 +83,19 @@ pub trait HttpHander {
 }
 
 
-
+///
+/// # HttpServer
+/// used to create a HTTP_SERVER
+/// 
+/// # Example
+/// ```
+/// let mut server  = HttpServer::create_server("localhost", 3000);
+/// server.get("/hello",|req,mut res| {
+///     println!("{:#?}","hello i am filterb");
+///     res.json("hello fetch");    
+/// })
+/// server.listen();
+/// ```
 pub struct HttpServer {
     listener: TcpListener,
     // port: u16,
@@ -45,6 +111,13 @@ impl HttpServer {
             filter_chain: FilterChain::new()
         }
     }
+    /// start listen request
+    /// 
+    /// # Example
+    /// ```
+    ///  let mut server  = HttpServer::create_server("localhost", 3000);
+    ///  server.listen();
+    /// ```
     pub fn listen(mut self) {
         let controller = Arc::new(self.controller.take().unwrap());
         let filter  = Arc::new(self.filter_chain);
