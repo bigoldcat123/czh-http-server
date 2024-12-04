@@ -14,13 +14,24 @@ fn main() {
     let mut server  = HttpServer::create_server("localhost", 3000);
     server.filter("/home",|req,res| {
         println!("{:#?}","hello i am filterb");
+        if req.url() == "/home/abc" {
+            res.json("GLALALALALALA");
+            return None
+        }
         Some((req,res))
     });
     server.map("/file","/Users/dadigua/Desktop/lifetime/app/nextjs-static/dist");
 
-    server.get("/home",|req,res| {
+    server.get("/home",|req,mut res| {
         println!("{:#?}",req.url());
+        // println!("{:#?}",req.headers());
+        println!("{:#?}",req.cookies());
+        res.set_cookie("cooooooo", "this is cookie setted by server");
         res.json("hello fetch");
+    });
+    server.get("/home/abc",|req,res| {
+        println!("{:#?}",req.url());
+        res.json("hello fetch/ home/abc");
     });
     
     server.post("/post",|mut req,res| {
@@ -33,7 +44,6 @@ fn main() {
                 return;
             },
         }
-
         println!("{:#?}",req.url());
         res.json("hello post");
     });

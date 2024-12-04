@@ -65,10 +65,34 @@ impl HttpRequest {
         self.status_line.method.as_str()
     }
 
+    pub fn cookies(&self) -> Option<HashMap<&str, &str>> {
+        
+        if let Some(cookie) = self.headers.get("Cookie") {
+            let mut cookies = HashMap::new();
+            let key_value = cookie.split("; ").collect::<Vec<&str>>();
+            key_value.iter().for_each(|x| {
+                
+                if let Some(key_value) = x.split_once("=") {
+                    cookies.insert(key_value.0, key_value.1);
+                }else {
+                    println!("{:#?}","cookie parse error");
+                }
+            });
+            Some(cookies)
+        }else {
+            None
+        }
+        
+    }
+
     pub fn url(&self) -> &str {
         self.status_line.url.as_str()
     }
 
+    /// /abc/abc => /abc
+    /// / => /
+    /// /efg/avc => /efg
+    /// /abc => /
     pub(crate) fn prefix_url(&self) -> &str {
         let mut stop = 1;
         for i in 1..self.url().len() {

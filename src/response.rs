@@ -87,6 +87,28 @@ impl HttpResponse {
             writer.write_all(&buffer[0..size]).unwrap();
         }
     }
+    /// Set-Cookie: <cookie-name>=<cookie-value>; Path=<path>; Expires=<date>; HttpOnly; Secure; SameSite=<strict|lax|none>
+    /// 
+    /// 
+    /// 1.	<cookie-name> 和 <cookie-value>：
+	/// •	cookie-name: Cookie 的键名。
+	/// •	cookie-value: Cookie 的值，支持 Base64 编码以存储复杂数据。
+	/// 2.	Path：
+	/// •	指定 Cookie 的作用范围。例如，Path=/ 使 Cookie 在整个网站有效。
+	/// 3.	Expires 或 Max-Age：
+	/// •	Expires: 设置具体过期时间（UTC 格式）。
+	/// •	Max-Age: 设置相对过期时间（秒数）。
+	/// 4.	HttpOnly：
+	/// •	限制 Cookie 只能通过 HTTP 请求访问，JavaScript 无法读取（防止 XSS 攻击）。
+	/// 5.	Secure：
+	/// •	仅在 HTTPS 请求中发送（提升安全性）。
+	/// 6.	SameSite：
+	/// •	Strict: 禁止跨站点发送 Cookie（最安全）。
+	/// •	Lax: 允许部分跨站点请求（如导航链接）。
+	/// •	None: 允许所有跨站点发送 Cookie，需配合 Secure。
+    pub fn set_cookie(&mut self, name: &str, value: &str) {
+        self.headers.insert("Set-Cookie".to_string(), format!("{}={};", name, value));
+    }
 }
 
 fn init_headers() -> HashMap<String, String> {
