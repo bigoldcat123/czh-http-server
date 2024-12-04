@@ -12,6 +12,10 @@ struct Student {
 fn main() {
     
     let mut server  = HttpServer::create_server("localhost", 3000);
+    server.filter("/home",|req,res| {
+        println!("{:#?}","hello i am filterb");
+        Some((req,res))
+    });
     server.map("/file","/Users/dadigua/Desktop/lifetime/app/nextjs-static/dist");
 
     server.get("/home",|req,res| {

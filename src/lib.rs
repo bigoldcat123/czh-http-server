@@ -8,12 +8,14 @@ use std::{
 };
 
 use controller::Controller;
+use filter::{Filter, FilterChain};
 use request::HttpRequest;
 use response::{ContentType, HttpResponse};
 mod controller;
 pub mod request;
 pub mod response;
 pub mod route;
+pub mod filter;
 type ControllerHandler = Box<dyn Fn(HttpRequest, HttpResponse) + Sync + Send + 'static>;
 pub trait HttpHander {
     fn get<T>(&mut self, url: &str, controller: T)
@@ -32,6 +34,7 @@ pub struct HttpServer {
     listener: TcpListener,
     // port: u16,
     controller: Option<Controller>,
+    filter_chain:FilterChain
 }
 impl HttpServer {
     pub fn create_server(host: &str, port: u16) -> Self {
@@ -39,18 +42,21 @@ impl HttpServer {
         HttpServer {
             listener,
             controller: Some(Controller::new()),
+            filter_chain: FilterChain::new()
         }
     }
     pub fn listen(mut self) {
         let controller = Arc::new(self.controller.take().unwrap());
+        let filter  = Arc::new(self.filter_chain);
         let pool = czhmt::ThreadPool::new(4);
         for client in self.listener.incoming() {
             print!("hello");
             match client {
                 Ok(stream) => {
                     let controller = controller.clone();
+                    let filter = filter.clone();
                     pool.exec(|| {
-                        handle_stream(stream, controller);
+                        handle_stream(stream, controller,filter);
                     });
                 }
                 Err(_) => {
@@ -110,6 +116,10 @@ impl HttpServer {
                 }
             });
     }
+    
+    pub fn filter(&mut self, url: &str, filter: impl Fn(HttpRequest,HttpResponse) -> Option<(HttpRequest,HttpResponse)> + Send + Sync + 'static) {
+        self.filter_chain.add_filter(Filter::new(filter),url);
+    }
 
 }
 
@@ -147,7 +157,7 @@ impl HttpHander for HttpServer {
         }
     }
 }
-pub fn handle_stream(stream: TcpStream, controller: Arc<Controller>) {
+pub fn handle_stream(stream: TcpStream, controller: Arc<Controller>,filter:Arc<FilterChain>) {
     let rc = Rc::new(RefCell::new(stream));
     let request = match HttpRequest::build(rc.clone()) {
         Ok(req) => req,
@@ -159,5 +169,11 @@ pub fn handle_stream(stream: TcpStream, controller: Arc<Controller>) {
         }
     };
     let response = HttpResponse::init(rc.clone(), request.version());
-    controller.handle_request(request, response);
+    if let Some((request, response)) = filter.exec(request, response)  {
+        controller.handle_request(request, response);
+    }else {
+
+    }
+
+    
 }
