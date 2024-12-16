@@ -200,7 +200,7 @@ impl HttpRequest {
         println!("remain -> {:#?}", remind);
         let mut total = 0;
         // loop {
-        let mut buf = [0 as u8; 1024 * 8];
+        let mut buf = [0 as u8; 1024 * 1024];
         if remind != 0 {
             let size = reader.read(&mut buf).unwrap();
             self.buffer.extend_from_slice(&buf[0..size]);
@@ -265,21 +265,9 @@ impl HttpRequest {
                     self.buffer.extend_from_slice(&buf[0..size]);
                     total += size;
                 }
-                for i in 0..self.buffer.len() - boundary_len {
-                    // let x = Vec::from(&self.buffer[i..i + boundary_len]);
-                    // println!(
-                    //     "-------->{:#?} -> {}",
-                    //     String::from_utf8(x).unwrap(),
-                    //     &self.buffer[i..i + boundary_len].len()
-                    // );
-                    // println!(
-                    //     "boundry->{:#?} -> {}",
-                    //     String::from_utf8(boundary.into()).unwrap(),
-                    //     boundary.len()
-                    // );
-                    // println!("{:#?}", self.buffer[i..boundary_len].eq(boundary));
-                    if self.buffer[i..i + boundary_len].eq(boundary) {
-                        // println!("{:#?}", &self.buffer[0..i - 2]);
+
+                match kmp_search(&self.buffer, boundary) {
+                    Some(i) => {
                         if let Some(f) = file.as_mut() {
                             f.write_all(&self.buffer[0..i - 2]).unwrap();
                         } else {
@@ -288,13 +276,42 @@ impl HttpRequest {
                             println!("{:#?}", x);
                         }
                         self.buffer.splice(0..i + boundary_len + 2, Vec::new());
-                        is_over = true;
+                        // is_over = true;
                         break;
                     }
+                    None => {}
                 }
-                if is_over {
-                    break;
-                };
+
+                // for i in 0..self.buffer.len() - boundary_len {
+                //     // let x = Vec::from(&self.buffer[i..i + boundary_len]);
+                //     // println!(
+                //     //     "-------->{:#?} -> {}",
+                //     //     String::from_utf8(x).unwrap(),
+                //     //     &self.buffer[i..i + boundary_len].len()
+                //     // );
+                //     // println!(
+                //     //     "boundry->{:#?} -> {}",
+                //     //     String::from_utf8(boundary.into()).unwrap(),
+                //     //     boundary.len()
+                //     // );
+                //     // println!("{:#?}", self.buffer[i..boundary_len].eq(boundary));
+                //     if self.buffer[i..i + boundary_len].eq(boundary) {
+                //         // println!("{:#?}", &self.buffer[0..i - 2]);
+                //         if let Some(f) = file.as_mut() {
+                //             f.write_all(&self.buffer[0..i - 2]).unwrap();
+                //         } else {
+                //             let x = String::from_utf8(self.buffer[0..i - 2].to_vec()).unwrap();
+                //             value.push_str(&x);
+                //             println!("{:#?}", x);
+                //         }
+                //         self.buffer.splice(0..i + boundary_len + 2, Vec::new());
+                //         is_over = true;
+                //         break;
+                //     }
+                // }
+                // if is_over {
+                //     break;
+                // };
                 if let Some(f) = file.as_mut() {
                     f.write_all(&self.buffer).unwrap();
                     self.buffer.clear();
