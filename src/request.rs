@@ -1,7 +1,9 @@
 use std::{
     cell::RefCell,
     collections::HashMap,
-    io::{BufRead, BufReader, Error, Read, Result},
+    fs::{self, File},
+    io::{BufRead, BufReader, Error, Read, Result, Write},
+    mem,
     net::TcpStream,
     ops::DerefMut,
     rc::Rc,
@@ -144,6 +146,7 @@ impl HttpRequest {
     }
 
     pub fn form_data(&mut self) -> Result<HashMap<String, FormDataType>> {
+        let mock = "/Users/dadigua/Desktop/lifetime/app/";
         let mut res = HashMap::new();
         let boundary = self.get_boundary()?;
         let boundary = boundary.as_bytes();
@@ -152,86 +155,129 @@ impl HttpRequest {
         let mut reader = BufReader::new(stream.deref_mut());
         let len = self.get_content_length()?;
         println!("{:#?}", self.headers);
-        if len == self.buffer.len() {
-            // parses
-            println!("{}", String::from_utf8(self.buffer.clone()).unwrap());
-        } else {
-            let remind = len - self.buffer.len();
-            println!("remain -> {:#?}", remind);
-            let mut total = 0;
-            // loop {
-            let mut buf = [0 as u8; 1024];
+        let remind = len - self.buffer.len();
+        println!("remain -> {:#?}", remind);
+        let mut total = 0;
+        // loop {
+        let mut buf = [0 as u8; 1024];
+        if remind != 0 {
             let size = reader.read(&mut buf).unwrap();
             self.buffer.extend_from_slice(&buf[0..size]);
             total += size;
-            self.buffer.splice(0..boundary_len + 2, vec![]);
-            // if self.buffer. parse header
-            let mut idx_buf = 0;
-            // let start = idx_buf + boundary_len;
-            let mut end;
-            loop {
-                loop {
-                    if idx_buf + 3 < self.buffer.len() {
-                        if self.buffer[idx_buf..idx_buf + 4].eq(b"\r\n\r\n")
-                        {
-                            end = idx_buf + 4;
-                            break;
-                        }
-                        idx_buf += 1;
-                    } else {
-                        let size = reader.read(&mut buf).unwrap();
-                        self.buffer.extend_from_slice(&buf[0..size]);
-                        total += size;
-                    }
-                }
-                let headers = String::from_utf8(self.buffer[..end].to_vec()).unwrap();
-                println!("header => {}", headers);
-                // println!("{:#?}", self.buffer.len());
-                self.buffer.splice(0..end, Vec::new());
-                // println!("{:#?}", self.buffer.len());
-                // println!("{:#?}", String::from_utf8(self.buffer.clone()));
+        }
 
-                loop {
-                    let mut is_over = false;
-                    while self.buffer.len() < boundary_len {
-                        let size = reader.read(&mut buf).unwrap();
-                        self.buffer.extend_from_slice(&buf[0..size]);
-                        total += size;
-                    }
-                    for i in 0..self.buffer.len() - boundary_len {
-                        // let x = Vec::from(&self.buffer[i..i + boundary_len]);
-                        // println!(
-                        //     "-------->{:#?} -> {}",
-                        //     String::from_utf8(x).unwrap(),
-                        //     &self.buffer[i..i + boundary_len].len()
-                        // );
-                        // println!(
-                        //     "boundry->{:#?} -> {}",
-                        //     String::from_utf8(boundary.into()).unwrap(),
-                        //     boundary.len()
-                        // );
-                        // println!("{:#?}", self.buffer[i..boundary_len].eq(boundary));
-                        if self.buffer[i..i + boundary_len].eq(boundary) {
-                            println!("{:#?}", &self.buffer[0..i - 2]);
-                            self.buffer.splice(0..i + boundary_len + 2, Vec::new());
-                            is_over = true;
-                            break;
-                        }
-                    }
-                    if is_over {
+        self.buffer.splice(0..boundary_len + 2, vec![]);
+
+        // if self.buffer. parse header
+        let mut idx_buf = 0;
+        // let start = idx_buf + boundary_len;
+        let mut end;
+        loop {
+            loop {
+                if idx_buf + 3 < self.buffer.len() {
+                    if self.buffer[idx_buf..idx_buf + 4].eq(b"\r\n\r\n") {
+                        end = idx_buf + 4;
                         break;
-                    };
+                    }
+                    idx_buf += 1;
+                } else {
                     let size = reader.read(&mut buf).unwrap();
                     self.buffer.extend_from_slice(&buf[0..size]);
                     total += size;
                 }
+            }
+            let headers = String::from_utf8(self.buffer[..end].to_vec()).unwrap();
+            // println!("header => {}", headers);
+            let headers: Vec<&str> = headers[..headers.len() - 4].split("\r\n").collect();
+            println!("{:#?}", headers);
+            let mut name;
+            let mut file_name: Option<String> = None;
+            let name_key = "name=\"";
+
+            // 查找 name 的值
+            let name_start = headers[0].find(name_key).unwrap() + name_key.len();
+            let name_end = headers[0][name_start..].find('"').unwrap() + name_start;
+            name = headers[0][name_start..name_end].to_string();
+            if headers.len() == 2 {
+                let filename_key = "filename=\"";
+                // 查找 filename 的值
+                let filename_start = headers[0].find(filename_key).unwrap() + filename_key.len();
+                let filename_end = headers[0][filename_start..].find('"').unwrap() + filename_start;
+                // 提取并返回
+                file_name = Some(headers[0][filename_start..filename_end].to_string());
+            }
+            self.buffer.splice(0..end, Vec::new());
+            let mut value = String::new();
+
+            loop {
+                let mut is_over = false;
+                while self.buffer.len() < boundary_len {
+                    let size = reader.read(&mut buf).unwrap();
+                    self.buffer.extend_from_slice(&buf[0..size]);
+                    total += size;
+                }
+                for i in 0..self.buffer.len() - boundary_len {
+                    // let x = Vec::from(&self.buffer[i..i + boundary_len]);
+                    // println!(
+                    //     "-------->{:#?} -> {}",
+                    //     String::from_utf8(x).unwrap(),
+                    //     &self.buffer[i..i + boundary_len].len()
+                    // );
+                    // println!(
+                    //     "boundry->{:#?} -> {}",
+                    //     String::from_utf8(boundary.into()).unwrap(),
+                    //     boundary.len()
+                    // );
+                    // println!("{:#?}", self.buffer[i..boundary_len].eq(boundary));
+                    if self.buffer[i..i + boundary_len].eq(boundary) {
+                        // println!("{:#?}", &self.buffer[0..i - 2]);
+                        if let Some(f) = file_name.as_ref() {
+                            let mut file = File::options()
+                                .append(true)
+                                .create(true)
+                                .open(format!("{}{}", mock, f))
+                                .unwrap();
+                            file.write_all(&self.buffer[0..i - 2]).unwrap();
+                        } else {
+                            let x = String::from_utf8(self.buffer[0..i - 2].to_vec()).unwrap();
+                            value.push_str(&x);
+                            println!("{:#?}", x);
+                        }
+                        self.buffer.splice(0..i + boundary_len + 2, Vec::new());
+                        is_over = true;
+                        break;
+                    }
+                }
+                if is_over {
+                    break;
+                };
+                if let Some(f) = file_name.as_ref() {
+                    let mut file = File::options()
+                        .append(true)
+                        .create(true)
+                        .open(format!("{}{}", mock, f))
+                        .unwrap();
+                    file.write_all(&self.buffer).unwrap();
+                    self.buffer.clear();
+                } else {
+                    let x = String::from_utf8(mem::take(&mut self.buffer)).unwrap();
+                    value.push_str(&x);
+                }
+
+                let size = reader.read(&mut buf).unwrap();
+                self.buffer.extend_from_slice(&buf[0..size]);
+                total += size;
+            }
+            if remind == 0 {
+                if self.buffer.len() <= boundary_len {
+                    break;
+                }
+            } else {
                 if total >= remind - boundary_len && self.buffer.len() <= boundary_len {
                     break;
                 }
-
-                idx_buf = 0;
             }
-            // }
+            idx_buf = 0;
         }
         Ok(res)
     }
@@ -269,14 +315,20 @@ fn parse_request_row(reader: &mut BufReader<&mut TcpStream>) -> Result<(String, 
 
 #[cfg(test)]
 mod tests {
+    use std::{fs::File, io::Write};
 
     #[test]
     fn it_works() {
-        let a: Vec<u8> = vec![1, 2, 3];
-        let c = [1, 2, 3];
-        let b = a.as_slice();
-        if b == c {
-            println!("{:#?}", "e");
-        }
+        let mut file = File::options()
+            .append(true)
+            .open("/Users/dadigua/Desktop/lifetime/app/a.txt")
+            .unwrap();
+        file.write(
+            "easdasdj
+       asjdlaisd
+       asjdl"
+                .as_bytes(),
+        )
+        .unwrap();
     }
 }
