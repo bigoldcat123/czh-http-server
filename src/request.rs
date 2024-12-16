@@ -2,7 +2,7 @@ use std::{
     cell::RefCell,
     collections::HashMap,
     fs::{self, File},
-    io::{BufRead, BufReader, Error, Read, Result, Write},
+    io::{BufRead, BufReader, BufWriter, Error, Read, Result, Write},
     mem,
     net::TcpStream,
     ops::DerefMut,
@@ -146,6 +146,47 @@ impl HttpRequest {
     }
 
     pub fn form_data(&mut self) -> Result<HashMap<String, FormDataType>> {
+        fn kmp_search(text: &[u8], pattern: &[u8]) -> Option<usize> {
+            let text_bytes = text;
+            let pattern_bytes = pattern;
+            let n = text_bytes.len();
+            let m = pattern_bytes.len();
+
+            if m == 0 {
+                return Some(0); // 空模式串默认匹配
+            }
+
+            // 构建部分匹配表 (next 数组)
+            let mut next = vec![0; m];
+            let mut j = 0;
+            for i in 1..m {
+                while j > 0 && pattern_bytes[i] != pattern_bytes[j] {
+                    j = next[j - 1]; // 回退
+                }
+                if pattern_bytes[i] == pattern_bytes[j] {
+                    j += 1;
+                }
+                next[i] = j;
+            }
+
+            // KMP 搜索
+            let mut j = 0; // 模式串指针
+            for i in 0..n {
+                while j > 0 && text_bytes[i] != pattern_bytes[j] {
+                    j = next[j - 1]; // 回退
+                }
+                if text_bytes[i] == pattern_bytes[j] {
+                    j += 1;
+                }
+                if j == m {
+                    // 找到匹配，返回起始位置
+                    return Some(i + 1 - m);
+                }
+            }
+
+            None // 未找到匹配
+        }
+
         let mock = "/Users/dadigua/Desktop/lifetime/app/";
         let mut res = HashMap::new();
         let boundary = self.get_boundary()?;
@@ -159,7 +200,7 @@ impl HttpRequest {
         println!("remain -> {:#?}", remind);
         let mut total = 0;
         // loop {
-        let mut buf = [0 as u8; 1024];
+        let mut buf = [0 as u8; 1024 * 8];
         if remind != 0 {
             let size = reader.read(&mut buf).unwrap();
             self.buffer.extend_from_slice(&buf[0..size]);
@@ -191,7 +232,8 @@ impl HttpRequest {
             let headers: Vec<&str> = headers[..headers.len() - 4].split("\r\n").collect();
             println!("{:#?}", headers);
             let mut name;
-            let mut file_name: Option<String> = None;
+            let mut file_name;
+            let mut file: Option<File> = None;
             let name_key = "name=\"";
 
             // 查找 name 的值
@@ -204,7 +246,14 @@ impl HttpRequest {
                 let filename_start = headers[0].find(filename_key).unwrap() + filename_key.len();
                 let filename_end = headers[0][filename_start..].find('"').unwrap() + filename_start;
                 // 提取并返回
-                file_name = Some(headers[0][filename_start..filename_end].to_string());
+                file_name = headers[0][filename_start..filename_end].to_string();
+                file = Some(
+                    File::options()
+                        .append(true)
+                        .create(true)
+                        .open(format!("{}{}", mock, file_name))
+                        .unwrap(),
+                );
             }
             self.buffer.splice(0..end, Vec::new());
             let mut value = String::new();
@@ -231,13 +280,8 @@ impl HttpRequest {
                     // println!("{:#?}", self.buffer[i..boundary_len].eq(boundary));
                     if self.buffer[i..i + boundary_len].eq(boundary) {
                         // println!("{:#?}", &self.buffer[0..i - 2]);
-                        if let Some(f) = file_name.as_ref() {
-                            let mut file = File::options()
-                                .append(true)
-                                .create(true)
-                                .open(format!("{}{}", mock, f))
-                                .unwrap();
-                            file.write_all(&self.buffer[0..i - 2]).unwrap();
+                        if let Some(f) = file.as_mut() {
+                            f.write_all(&self.buffer[0..i - 2]).unwrap();
                         } else {
                             let x = String::from_utf8(self.buffer[0..i - 2].to_vec()).unwrap();
                             value.push_str(&x);
@@ -251,13 +295,8 @@ impl HttpRequest {
                 if is_over {
                     break;
                 };
-                if let Some(f) = file_name.as_ref() {
-                    let mut file = File::options()
-                        .append(true)
-                        .create(true)
-                        .open(format!("{}{}", mock, f))
-                        .unwrap();
-                    file.write_all(&self.buffer).unwrap();
+                if let Some(f) = file.as_mut() {
+                    f.write_all(&self.buffer).unwrap();
                     self.buffer.clear();
                 } else {
                     let x = String::from_utf8(mem::take(&mut self.buffer)).unwrap();
@@ -330,5 +369,57 @@ mod tests {
                 .as_bytes(),
         )
         .unwrap();
+    }
+
+    #[test]
+    fn kmd_test() {
+        fn kmp_search(text: &[u8], pattern: &[u8]) -> Option<usize> {
+            let text_bytes = text;
+            let pattern_bytes = pattern;
+            let n = text_bytes.len();
+            let m = pattern_bytes.len();
+
+            if m == 0 {
+                return Some(0); // 空模式串默认匹配
+            }
+
+            // 构建部分匹配表 (next 数组)
+            let mut next = vec![0; m];
+            let mut j = 0;
+            for i in 1..m {
+                while j > 0 && pattern_bytes[i] != pattern_bytes[j] {
+                    j = next[j - 1]; // 回退
+                }
+                if pattern_bytes[i] == pattern_bytes[j] {
+                    j += 1;
+                }
+                next[i] = j;
+            }
+
+            // KMP 搜索
+            let mut j = 0; // 模式串指针
+            for i in 0..n {
+                while j > 0 && text_bytes[i] != pattern_bytes[j] {
+                    j = next[j - 1]; // 回退
+                }
+                if text_bytes[i] == pattern_bytes[j] {
+                    j += 1;
+                }
+                if j == m {
+                    // 找到匹配，返回起始位置
+                    return Some(i + 1 - m);
+                }
+            }
+
+            None // 未找到匹配
+        }
+
+        let text = "ababcabcacbab";
+        let pattern = "abcac";
+
+        match kmp_search(text.as_bytes(), pattern.as_bytes()) {
+            Some(index) => println!("Pattern found at index: {}", index),
+            None => println!("Pattern not found"),
+        }
     }
 }
