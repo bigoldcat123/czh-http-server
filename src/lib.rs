@@ -27,7 +27,7 @@
 //!        println!("{:#?}",req.url());
 //!        res.json("hello fetch/ home/abc");
 //!    });
-//!    
+//!
 //!    server.post("/post",|mut req,res| {
 //!        match req.json::<Student>() {
 //!            Ok(stu) => {
@@ -58,7 +58,13 @@
 //! ```
 //!
 use std::{
-    cell::RefCell, fs::File, mem, net::{TcpListener, TcpStream}, path::{Path, PathBuf}, rc::Rc, sync::Arc
+    cell::RefCell,
+    fs::File,
+    mem,
+    net::{TcpListener, TcpStream},
+    path::{Path, PathBuf},
+    rc::Rc,
+    sync::Arc,
 };
 
 use controller::Controller;
@@ -66,10 +72,10 @@ use filter::{Filter, FilterChain};
 use request::HttpRequest;
 use response::{ContentType, HttpResponse};
 mod controller;
+pub mod filter;
 pub mod request;
 pub mod response;
 pub mod route;
-pub mod filter;
 type ControllerHandler = Box<dyn Fn(HttpRequest, HttpResponse) + Sync + Send + 'static>;
 pub trait HttpHander {
     fn get<T>(&mut self, url: &str, controller: T)
@@ -82,25 +88,25 @@ pub trait HttpHander {
     fn router(&mut self, url: &str, route: route::Route);
 }
 
-
 ///
 /// # HttpServer
 /// used to create a HTTP_SERVER
-/// 
+///
 /// # Example
 /// ```
 /// let mut server  = HttpServer::create_server("localhost", 3000);
 /// server.get("/hello",|req,mut res| {
 ///     println!("{:#?}","hello i am filterb");
-///     res.json("hello fetch");    
+///     res.json("hello fetch");
 /// })
 /// server.listen();
 /// ```
 pub struct HttpServer {
     listener: TcpListener,
-    // port: u16,
+    port: u16,
+    host: String,
     controller: Option<Controller>,
-    filter_chain:FilterChain
+    filter_chain: Option<FilterChain>,
 }
 impl HttpServer {
     pub fn create_server(host: &str, port: u16) -> Self {
@@ -108,28 +114,31 @@ impl HttpServer {
         HttpServer {
             listener,
             controller: Some(Controller::new()),
-            filter_chain: FilterChain::new()
+            filter_chain: Some(FilterChain::new()),
+            port,
+            host: String::from(host),
         }
     }
     /// start listen request
-    /// 
+    ///
     /// # Example
     /// ```
     ///  let mut server  = HttpServer::create_server("localhost", 3000);
     ///  server.listen();
     /// ```
     pub fn listen(mut self) {
-        let controller = Arc::new(self.controller.take().unwrap());
-        let filter  = Arc::new(self.filter_chain);
+        println!("server start at {} {}", self.port, self.host);
         let pool = czhmt::ThreadPool::new(4);
+
+        let controller = Arc::new(self.controller.take().unwrap());
+        let filter = Arc::new(self.filter_chain.take().unwrap());
         for client in self.listener.incoming() {
-            print!("hello");
             match client {
                 Ok(stream) => {
                     let controller = controller.clone();
                     let filter = filter.clone();
                     pool.exec(|| {
-                        handle_stream(stream, controller,filter);
+                        handle_stream(stream, controller, filter);
                     });
                 }
                 Err(_) => {
@@ -189,11 +198,20 @@ impl HttpServer {
                 }
             });
     }
-    
-    pub fn filter(&mut self, url: &str, filter: impl Fn(HttpRequest,HttpResponse) -> Option<(HttpRequest,HttpResponse)> + Send + Sync + 'static) {
-        self.filter_chain.add_filter(Filter::new(filter),url);
-    }
 
+    pub fn filter(
+        &mut self,
+        url: &str,
+        filter: impl Fn(HttpRequest, HttpResponse) -> Option<(HttpRequest, HttpResponse)>
+            + Send
+            + Sync
+            + 'static,
+    ) {
+        self.filter_chain
+            .as_mut()
+            .unwrap()
+            .add_filter(Filter::new(filter), url);
+    }
 }
 
 impl HttpHander for HttpServer {
@@ -218,19 +236,33 @@ impl HttpHander for HttpServer {
     fn router(&mut self, url: &str, route: route::Route) {
         let self_controller = self.controller.as_mut().unwrap();
         let controller = route.get_controller();
-        let mut handlers: std::collections::HashMap<String, std::collections::HashMap<String, Box<dyn Fn(HttpRequest, HttpResponse) + Send + Sync>>> = controller.take();
-        let methods = handlers.keys().map(|key| key.to_string()).collect::<Vec<String>>();
-        for method in methods{
+        let mut handlers: std::collections::HashMap<
+            String,
+            std::collections::HashMap<String, Box<dyn Fn(HttpRequest, HttpResponse) + Send + Sync>>,
+        > = controller.take();
+        let methods = handlers
+            .keys()
+            .map(|key| key.to_string())
+            .collect::<Vec<String>>();
+        for method in methods {
             let mut handers_inner = handlers.remove(method.as_str()).unwrap();
-            let url_inner = handers_inner.keys().map(|key| key.to_string()).collect::<Vec<String>>();
+            let url_inner = handers_inner
+                .keys()
+                .map(|key| key.to_string())
+                .collect::<Vec<String>>();
             for handler_inner in url_inner {
-                let handler: Box<dyn Fn(HttpRequest, HttpResponse) + Send + Sync> = handers_inner.remove(handler_inner.as_str()).unwrap();
-                self_controller.add_handler(method.as_str(), format!("{}{}",url,handler_inner).as_str(), handler);
+                let handler: Box<dyn Fn(HttpRequest, HttpResponse) + Send + Sync> =
+                    handers_inner.remove(handler_inner.as_str()).unwrap();
+                self_controller.add_handler(
+                    method.as_str(),
+                    format!("{}{}", url, handler_inner).as_str(),
+                    handler,
+                );
             }
         }
     }
 }
-pub fn handle_stream(stream: TcpStream, controller: Arc<Controller>,filter:Arc<FilterChain>) {
+pub fn handle_stream(stream: TcpStream, controller: Arc<Controller>, filter: Arc<FilterChain>) {
     let rc = Rc::new(RefCell::new(stream));
     let request = match HttpRequest::build(rc.clone()) {
         Ok(req) => req,
@@ -242,11 +274,7 @@ pub fn handle_stream(stream: TcpStream, controller: Arc<Controller>,filter:Arc<F
         }
     };
     let response = HttpResponse::init(rc.clone(), request.version());
-    if let Some((request, response)) = filter.exec(request, response)  {
+    if let Some((request, response)) = filter.exec(request, response) {
         controller.handle_request(request, response);
-    }else {
-
     }
-
-    
 }
