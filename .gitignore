@@ -20,7 +20,7 @@
 
 # production
 /build
-*/target
+http-server-async-czh/target
 # misc
 .DS_Store
 *.pem
