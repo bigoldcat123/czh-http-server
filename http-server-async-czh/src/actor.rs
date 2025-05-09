@@ -12,8 +12,11 @@ pub type Routes = HashMap<
         &'static str,
         Box<
             dyn Fn(
-                Request<String>,
-            ) -> Pin<Box<dyn Future<Output = Response<String>> + Send + 'static>>,
+                    Request<String>,
+                )
+                    -> Pin<Box<dyn Future<Output = Response<String>> + Send + 'static>>
+                + 'static
+                + Send,
         >,
     >,
 >;
@@ -21,8 +24,20 @@ pub type Routes = HashMap<
 pub struct ProcessActor {
     routes: Routes,
     receiver: Receiver<Request<String>>,
+    response_handle: ResponseHandle,
 }
 impl ProcessActor {
+    pub fn new(
+        routes: Routes,
+        receiver: Receiver<Request<String>>,
+        response_handle: ResponseHandle,
+    ) -> Self {
+        Self {
+            receiver,
+            routes,
+            response_handle,
+        }
+    }
     pub async fn run(mut self) {
         while let Some(r) = self.receiver.recv().await {
             if let Some(e) = self.routes.get(r.method()) {
@@ -70,4 +85,10 @@ impl<T: AsyncWrite + Unpin + Send + 'static> ResponseActor<T> {
         }
     }
 }
-struct ResponseHandle {}
+pub struct ResponseHandle {}
+
+impl ResponseHandle {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
