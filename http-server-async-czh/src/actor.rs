@@ -1,20 +1,25 @@
 use std::{collections::HashMap, pin::Pin};
 
-use futures::SinkExt;
 use http::{Method, Request, Response};
-use tokio::{io::AsyncWrite, stream, sync::mpsc::Receiver};
-use tokio_util::codec::{FramedWrite, LinesCodec};
+use tokio::{io::AsyncWrite, sync::mpsc::Receiver};
+use tokio_util::codec::FramedWrite;
 
 use crate::encoder::ResponseEncoder;
 
-pub struct ProcessActor {
-    routes: HashMap<
-        Method,
-        HashMap<
-            &'static str,
-            Box<dyn Fn(Request<String>) -> Pin<Box<dyn Future<Output = Response<String>> + Send>>>,
+pub type Routes = HashMap<
+    Method,
+    HashMap<
+        &'static str,
+        Box<
+            dyn Fn(
+                Request<String>,
+            ) -> Pin<Box<dyn Future<Output = Response<String>> + Send + 'static>>,
         >,
     >,
+>;
+
+pub struct ProcessActor {
+    routes: Routes,
     receiver: Receiver<Request<String>>,
 }
 impl ProcessActor {
@@ -60,7 +65,6 @@ impl<T: AsyncWrite + Unpin + Send + 'static> ResponseActor<T> {
             if let Some(rts) = self.routes.get_mut(&m) {
                 if let Some(sink) = rts.get_mut(&p) {
                     r.body().bytes().into_iter();
-                    
                 }
             }
         }
