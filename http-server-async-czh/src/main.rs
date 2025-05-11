@@ -1,7 +1,7 @@
-use std::{error::Error, pin::Pin};
+use std::error::Error;
 
 use http::{Request, Response};
-use http_server_async_czh::{CzhServer, actor::RouteHandler};
+use http_server_async_czh::CzhServer;
 
 async fn hello(req: Request<String>) -> Response<String> {
     Response::new("body".to_string())

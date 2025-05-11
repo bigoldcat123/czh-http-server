@@ -1,4 +1,4 @@
-use std::{collections::HashMap, pin::Pin};
+use std::{collections::HashMap, pin::Pin, sync::Arc};
 
 use futures::SinkExt;
 use http::{Method, Request, Response};
@@ -10,10 +10,16 @@ use tokio_util::codec::FramedWrite;
 
 use crate::encoder::ResponseEncoder;
 
-pub type RouteHandler = Box<
-    dyn Fn(Request<String>) -> Pin<Box<dyn Future<Output = Response<String>> + Send + 'static>>
-        + 'static
-        + Send,
+pub type RouteHandler = Arc<
+    Box<
+        dyn Fn(
+                Request<String>,
+            )
+                -> Pin<Box<dyn Future<Output = Response<String>> + Send + 'static + Sync>>
+            + 'static
+            + Send
+            + Sync,
+    >,
 >;
 pub type Routes = HashMap<Method, HashMap<&'static str, RouteHandler>>;
 
@@ -29,7 +35,9 @@ impl ProcessActor {
         while let Some(r) = self.receiver.recv().await {
             if let Some(e) = self.routes.get(r.0.method()) {
                 if let Some(m) = e.get("k") {
-                    let _ = m(r.0).await;
+                    tokio::spawn(async move {
+                        m(r.0).await;
+                    });
                 }
             }
         }
@@ -63,7 +71,7 @@ impl ResponseActor {
 
     pub async fn run(mut self) {
         while let Some(n) = self.receiver.recv().await {
-            self.sink.send(n);
+            let _ = self.sink.send(n).await;
         }
     }
 }
@@ -75,5 +83,8 @@ pub struct ResponseHandle {
 impl ResponseHandle {
     pub fn new(sender: Sender<Response<String>>) -> Self {
         Self { sender }
+    }
+    pub async fn send(&mut self, res: Response<String>) -> Result<(), SendError<Response<String>>> {
+        self.sender.send(res).await
     }
 }
