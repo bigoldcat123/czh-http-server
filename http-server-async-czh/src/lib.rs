@@ -36,13 +36,16 @@ impl CzhServer {
             let mut process_handle = self.process_handle.clone();
             let (stream, sink) = client.into_split();
 
+            let (sender, receiver) = tokio::sync::mpsc::channel(10);
+            let response_actor = ResponseActor::new(sink, receiver);
 
-            let Response_actor = ResponseActor::new(sink);
+            tokio::spawn(response_actor.run());
 
             tokio::spawn(async move {
                 let mut stream = FramedRead::new(stream, RequestDecoder::new());
+                let response_handle = ResponseHandle::new(sender);
                 while let Some(Ok(next)) = stream.next().await {
-                    let _ = process_handle.send((next, ResponseHandle {})).await;
+                    let _ = process_handle.send((next, response_handle.clone())).await;
                 }
             });
         }

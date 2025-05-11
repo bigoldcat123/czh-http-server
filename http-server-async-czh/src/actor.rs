@@ -1,10 +1,14 @@
 use std::{collections::HashMap, pin::Pin};
 
+use futures::SinkExt;
 use http::{Method, Request, Response};
 use tokio::{
     net::tcp::OwnedWriteHalf,
     sync::mpsc::{Receiver, Sender, error::SendError},
 };
+use tokio_util::codec::FramedWrite;
+
+use crate::encoder::ResponseEncoder;
 
 pub type RouteHandler = Box<
     dyn Fn(Request<String>) -> Pin<Box<dyn Future<Output = Response<String>> + Send + 'static>>
@@ -47,12 +51,29 @@ impl ProcessHandle {
         Ok(())
     }
 }
-pub struct ResponseActor {}
+pub struct ResponseActor {
+    sink: FramedWrite<OwnedWriteHalf, ResponseEncoder>,
+    receiver: Receiver<Response<String>>,
+}
 impl ResponseActor {
-    pub fn new(sink: OwnedWriteHalf) -> Self {
-        Self {}
+    pub fn new(sink: OwnedWriteHalf, receiver: Receiver<Response<String>>) -> Self {
+        let sink = FramedWrite::new(sink, ResponseEncoder::new());
+        Self { sink, receiver }
+    }
+
+    pub async fn run(mut self) {
+        while let Some(n) = self.receiver.recv().await {
+            self.sink.send(n);
+        }
     }
 }
-pub struct ResponseHandle {}
+#[derive(Clone)]
+pub struct ResponseHandle {
+    sender: Sender<Response<String>>,
+}
 
-impl ResponseHandle {}
+impl ResponseHandle {
+    pub fn new(sender: Sender<Response<String>>) -> Self {
+        Self { sender }
+    }
+}
