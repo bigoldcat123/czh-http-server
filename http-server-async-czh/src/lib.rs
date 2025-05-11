@@ -1,6 +1,8 @@
-use std::{collections::HashMap, error::Error};
+use std::{collections::HashMap, error::Error, sync::Arc};
 
-use actor::{ProcessActor, ProcessHandle, ResponseActor, ResponseHandle, RouteHandler, Routes};
+use actor::{
+    ProcessActor, ProcessHandle, ResponseActor, ResponseHandle, RouteHandler, Routes, SharedRoutes,
+};
 use decoder::RequestDecoder;
 use futures::StreamExt;
 use http::{Method, Request, Response};
@@ -89,8 +91,21 @@ impl CzhServerBuilder {
     pub fn build(self) -> CzhServer {
         let (process_sender, process_reciver) = tokio::sync::mpsc::channel(10);
         CzhServer {
-            process_actor: ProcessActor::new(self.routes, process_reciver),
+            process_actor: ProcessActor::new(convert2shared(self.routes), process_reciver),
             process_handle: ProcessHandle::new(process_sender),
         }
     }
+}
+
+fn convert2shared(routes: Routes) -> SharedRoutes {
+    let mut res = HashMap::new();
+
+    routes.into_iter().for_each(|(k, v)| {
+        let mut new_map = HashMap::new();
+        v.into_iter().for_each(|(innder_k, inner_v)| {
+            new_map.insert(innder_k, Arc::new(inner_v));
+        });
+        res.insert(k, Arc::new(new_map));
+    });
+    res
 }

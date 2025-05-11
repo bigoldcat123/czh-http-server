@@ -33,12 +33,14 @@ impl ProcessActor {
         Self { receiver, routes }
     }
     pub async fn run(mut self) {
-        while let Some(r) = self.receiver.recv().await {
-            if let Some(e) = self.routes.get(r.0.method()) {
+        while let Some((req, response_handle)) = self.receiver.recv().await {
+            if let Some(e) = self.routes.get(req.method()) {
                 if let Some(m) = Arc::clone(e).get("k") {
                     let m = Arc::clone(m);
+                    let mut response_handle = response_handle.clone();
                     tokio::spawn(async move {
-                        m(r.0).await;
+                        let res = m(req).await;
+                        let _ = response_handle.send(res).await;
                     });
                 }
             }
