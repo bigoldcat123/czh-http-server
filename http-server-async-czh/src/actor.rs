@@ -10,31 +10,33 @@ use tokio_util::codec::FramedWrite;
 
 use crate::encoder::ResponseEncoder;
 
-pub type RouteHandler = Arc<
-    Box<
-        dyn Fn(
-                Request<String>,
-            )
-                -> Pin<Box<dyn Future<Output = Response<String>> + Send + 'static + Sync>>
-            + 'static
-            + Send
-            + Sync,
-    >,
+pub type RouteHandler = Box<
+    dyn Fn(
+            Request<String>,
+        ) -> Pin<Box<dyn Future<Output = Response<String>> + Send + 'static + Sync>>
+        + 'static
+        + Send
+        + Sync,
 >;
 pub type Routes = HashMap<Method, HashMap<&'static str, RouteHandler>>;
+pub type SharedRoutes = HashMap<Method, Arc<HashMap<&'static str, Arc<RouteHandler>>>>;
 
 pub struct ProcessActor {
-    routes: Routes,
+    routes: SharedRoutes,
     receiver: Receiver<(Request<String>, ResponseHandle)>,
 }
 impl ProcessActor {
-    pub fn new(routes: Routes, receiver: Receiver<(Request<String>, ResponseHandle)>) -> Self {
+    pub fn new(
+        routes: SharedRoutes,
+        receiver: Receiver<(Request<String>, ResponseHandle)>,
+    ) -> Self {
         Self { receiver, routes }
     }
     pub async fn run(mut self) {
         while let Some(r) = self.receiver.recv().await {
             if let Some(e) = self.routes.get(r.0.method()) {
-                if let Some(m) = e.get("k") {
+                if let Some(m) = Arc::clone(e).get("k") {
+                    let m = Arc::clone(m);
                     tokio::spawn(async move {
                         m(r.0).await;
                     });
