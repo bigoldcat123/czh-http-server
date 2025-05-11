@@ -1,0 +1,22 @@
+use std::io;
+
+use http::Request;
+use tokio_util::codec::Decoder;
+
+pub struct RequestDecoder {}
+impl RequestDecoder {
+    pub(crate) fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Decoder for RequestDecoder {
+    type Error = io::Error;
+    type Item = Request<String>;
+    fn decode(
+        &mut self,
+        src: &mut tokio_util::bytes::BytesMut,
+    ) -> Result<Option<Self::Item>, Self::Error> {
+        Ok(None)
+    }
+}

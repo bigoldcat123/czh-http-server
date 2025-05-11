@@ -1,94 +1,58 @@
 use std::{collections::HashMap, pin::Pin};
 
 use http::{Method, Request, Response};
-use tokio::{io::AsyncWrite, sync::mpsc::Receiver};
-use tokio_util::codec::FramedWrite;
+use tokio::{
+    net::tcp::OwnedWriteHalf,
+    sync::mpsc::{Receiver, Sender, error::SendError},
+};
 
-use crate::encoder::ResponseEncoder;
-
-pub type Routes = HashMap<
-    Method,
-    HashMap<
-        &'static str,
-        Box<
-            dyn Fn(
-                    Request<String>,
-                )
-                    -> Pin<Box<dyn Future<Output = Response<String>> + Send + 'static>>
-                + 'static
-                + Send,
-        >,
-    >,
+pub type RouteHandler = Box<
+    dyn Fn(Request<String>) -> Pin<Box<dyn Future<Output = Response<String>> + Send + 'static>>
+        + 'static
+        + Send,
 >;
+pub type Routes = HashMap<Method, HashMap<&'static str, RouteHandler>>;
 
 pub struct ProcessActor {
     routes: Routes,
-    receiver: Receiver<Request<String>>,
-    response_handle: ResponseHandle,
+    receiver: Receiver<(Request<String>, ResponseHandle)>,
 }
 impl ProcessActor {
-    pub fn new(
-        routes: Routes,
-        receiver: Receiver<Request<String>>,
-        response_handle: ResponseHandle,
-    ) -> Self {
-        Self {
-            receiver,
-            routes,
-            response_handle,
-        }
+    pub fn new(routes: Routes, receiver: Receiver<(Request<String>, ResponseHandle)>) -> Self {
+        Self { receiver, routes }
     }
     pub async fn run(mut self) {
         while let Some(r) = self.receiver.recv().await {
-            if let Some(e) = self.routes.get(r.method()) {
+            if let Some(e) = self.routes.get(r.0.method()) {
                 if let Some(m) = e.get("k") {
-                    let _ = m(r).await;
+                    let _ = m(r.0).await;
                 }
             }
         }
     }
 }
-struct ProcessHandle {}
-pub struct ResponseActor<T>
-where
-    T: AsyncWrite,
-{
-    routes: HashMap<Method, HashMap<String, FramedWrite<T, ResponseEncoder>>>,
-    receiver: Receiver<(Method, String, Response<String>)>,
+#[derive(Clone)]
+pub struct ProcessHandle {
+    sender: Sender<(Request<String>, ResponseHandle)>,
 }
-
-impl<T: AsyncWrite + Unpin + Send + 'static> ResponseActor<T> {
-    pub fn new() -> Self {
-        let (sender, receiver) = tokio::sync::mpsc::channel(10);
-        let (sender2, mut receiver2) = tokio::sync::mpsc::channel::<T>(10);
-        tokio::spawn(async move {
-            let e = receiver2.recv().await.unwrap();
-            let e = FramedWrite::new(e, ResponseEncoder::new());
-            let mut ee = Self::new();
-            ee.routes
-                .get_mut(&Method::POST)
-                .unwrap()
-                .insert("k".to_string(), e);
-        });
-        Self {
-            routes: HashMap::new(),
-            receiver: receiver,
-        }
+impl ProcessHandle {
+    pub fn new(sender: Sender<(Request<String>, ResponseHandle)>) -> Self {
+        Self { sender }
     }
-    pub async fn run(mut self) {
-        while let Some((m, p, r)) = self.receiver.recv().await {
-            if let Some(rts) = self.routes.get_mut(&m) {
-                if let Some(sink) = rts.get_mut(&p) {
-                    r.body().bytes().into_iter();
-                }
-            }
-        }
+    pub async fn send(
+        &mut self,
+        req: (Request<String>, ResponseHandle),
+    ) -> Result<(), SendError<(Request<String>, ResponseHandle)>> {
+        self.sender.send(req).await?;
+        Ok(())
+    }
+}
+pub struct ResponseActor {}
+impl ResponseActor {
+    pub fn new(sink: OwnedWriteHalf) -> Self {
+        Self {}
     }
 }
 pub struct ResponseHandle {}
 
-impl ResponseHandle {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
+impl ResponseHandle {}
