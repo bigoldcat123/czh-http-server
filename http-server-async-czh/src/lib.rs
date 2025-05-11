@@ -43,18 +43,21 @@ impl CzhServer {
     async fn start_server(process_handle: ProcessHandle) -> Result<(), Box<dyn Error>> {
         let server = TcpListener::bind("localhost:7788").await?;
         while let Ok((client, _)) = server.accept().await {
+            info!("1. received req");
             let mut process_handle = process_handle.clone();
             let (stream, sink) = client.into_split();
 
             let (sender, receiver) = tokio::sync::mpsc::channel(10);
             let response_actor = ResponseActor::new(sink, receiver);
 
+            info!("2. start response_actor");
             tokio::spawn(response_actor.run());
 
             tokio::spawn(async move {
                 let mut stream = FramedRead::new(stream, RequestDecoder::new());
                 let response_handle = ResponseHandle::new(sender);
                 while let Some(Ok(next)) = stream.next().await {
+                    info!("3. parse stream to req instanse");
                     let _ = process_handle.send((next, response_handle.clone())).await;
                 }
             });
@@ -75,6 +78,9 @@ impl CzhServerBuilder {
         if let Some(e) = self.routes.get_mut(&Method::POST) {
             e.insert(path, Box::new(move |req| Box::pin(f(req))));
         } else {
+            let new_map = HashMap::new();
+            self.routes.insert(Method::POST, new_map);
+            return self.post(path, f);
         }
         self
     }

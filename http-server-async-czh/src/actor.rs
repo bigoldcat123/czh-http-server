@@ -2,6 +2,7 @@ use std::{collections::HashMap, pin::Pin, sync::Arc};
 
 use futures::SinkExt;
 use http::{Method, Request, Response};
+use log::{error, info};
 use tokio::{
     net::tcp::OwnedWriteHalf,
     sync::mpsc::{Receiver, Sender, error::SendError},
@@ -34,15 +35,22 @@ impl ProcessActor {
     }
     pub async fn run(mut self) {
         while let Some((req, response_handle)) = self.receiver.recv().await {
+            info!("4. receive parsed req");
             if let Some(e) = self.routes.get(req.method()) {
-                if let Some(m) = Arc::clone(e).get("k") {
+                if let Some(m) = Arc::clone(e).get("/") {
                     let m = Arc::clone(m);
                     let mut response_handle = response_handle.clone();
                     tokio::spawn(async move {
+                        info!("5. exec routes handler");
                         let res = m(req).await;
+                        info!("6. send response to response actor");
                         let _ = response_handle.send(res).await;
                     });
+                }else {
+                    error!("no such puth");
                 }
+            }else {
+                error!("no such method");
             }
         }
     }
@@ -75,6 +83,7 @@ impl ResponseActor {
 
     pub async fn run(mut self) {
         while let Some(n) = self.receiver.recv().await {
+            info!("7. serialize response to sink");
             let _ = self.sink.send(n).await;
         }
     }

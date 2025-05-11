@@ -11,7 +11,7 @@ async fn hello(req: Request<String>) -> Response<String> {
 async fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();
     let _ = CzhServer::builder()
-        .post("/hello", async |_| Response::new("body".to_string()))
+        .post("/", async |_| Response::new("body".to_string()))
         .post("/a", hello)
         .posts(vec![
             (

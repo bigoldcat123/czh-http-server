@@ -1,6 +1,6 @@
 use std::io;
 
-use http::Request;
+use http::{Method, Request};
 use tokio_util::codec::Decoder;
 
 pub struct RequestDecoder {}
@@ -17,6 +17,12 @@ impl Decoder for RequestDecoder {
         &mut self,
         src: &mut tokio_util::bytes::BytesMut,
     ) -> Result<Option<Self::Item>, Self::Error> {
-        Ok(None)
+        src.clear();
+        let req = Request::builder()
+            .uri("https://localhost:8846")
+            .method(Method::POST)
+            .body("body".to_string())
+            .unwrap();
+        Ok(Some(req))
     }
 }
