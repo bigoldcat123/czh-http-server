@@ -2,6 +2,7 @@ use std::error::Error;
 
 use http::{Request, Response};
 use http_server_async_czh::CzhServer;
+use log::info;
 
 async fn hello(req: Request<String>) -> Response<String> {
     Response::new("body".to_string())
@@ -11,7 +12,10 @@ async fn hello(req: Request<String>) -> Response<String> {
 async fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();
     let _ = CzhServer::builder()
-        .post("/", async |_| Response::new("body".to_string()))
+        .post("/", async |_| {
+            info!("i am executed");
+            Response::new("body".to_string())
+        })
         .post("/a", hello)
         .posts(vec![
             (

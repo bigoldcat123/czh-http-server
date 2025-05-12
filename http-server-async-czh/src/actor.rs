@@ -37,14 +37,14 @@ impl ProcessActor {
         while let Some((req, response_handle)) = self.receiver.recv().await {
             info!("4. receive parsed req");
             if let Some(e) = self.routes.get(req.method()) {
-                if let Some(m) = Arc::clone(e).get("/") {
+                if let Some(m) = Arc::clone(e).get(req.uri().path()) {
                     let m = Arc::clone(m);
                     let mut response_handle = response_handle.clone();
                     tokio::spawn(async move {
                         info!("5. exec routes handler");
                         let res = m(req).await;
                         info!("6. send response to response actor");
-                        // let _ = response_handle.send(res).await;
+                        let _ = response_handle.send(res).await;
                     });
                 }else {
                     error!("no such puth");
@@ -84,6 +84,7 @@ impl ResponseActor {
     pub async fn run(mut self) {
         while let Some(n) = self.receiver.recv().await {
             info!("7. serialize response to sink");
+            info!("{:?}",n);
             let _ = self.sink.send(n).await;
         }
     }
