@@ -1,4 +1,3 @@
-use http::{HeaderValue, Response};
 
 #[test]
 fn test_function() {

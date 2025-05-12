@@ -1,7 +1,6 @@
 use std::{io, str::FromStr};
 
-use futures::future::ok;
-use http::{HeaderName, HeaderValue, Method, Request};
+use http::{HeaderName, HeaderValue, Request};
 use log::info;
 use tokio_util::{bytes::Buf, codec::Decoder};
 

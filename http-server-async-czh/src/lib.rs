@@ -3,6 +3,7 @@ use std::{collections::HashMap, error::Error, sync::Arc};
 use actor::{
     ProcessActor, ProcessHandle, ResponseActor, ResponseHandle, RouteHandler, Routes, SharedRoutes,
 };
+use body_type::ResponseBody;
 use decoder::RequestDecoder;
 use futures::StreamExt;
 use http::{Method, Request, Response};
@@ -14,6 +15,7 @@ pub mod actor;
 
 pub mod decoder;
 pub mod encoder;
+pub mod body_type;
 
 pub struct CzhServer {
     process_actor: ProcessActor,
@@ -73,7 +75,7 @@ impl CzhServerBuilder {
     pub fn post<T, F>(mut self, path: &'static str, f: T) -> Self
     where
         T: 'static + Fn(Request<String>) -> F + Send + Sync,
-        F: Future<Output = Response<Vec<u8>>> + 'static + Send + Sync,
+        F: Future<Output = Response<ResponseBody>> + 'static + Send + Sync,
     {
         if let Some(e) = self.routes.get_mut(&Method::POST) {
             e.insert(path, Box::new(move |req| Box::pin(f(req))));

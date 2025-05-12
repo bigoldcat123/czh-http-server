@@ -9,12 +9,12 @@ use tokio::{
 };
 use tokio_util::codec::FramedWrite;
 
-use crate::encoder::ResponseEncoder;
+use crate::{body_type::ResponseBody, encoder::ResponseEncoder};
 
 pub type RouteHandler = Box<
     dyn Fn(
             Request<String>,
-        ) -> Pin<Box<dyn Future<Output = Response<Vec<u8>>> + Send + 'static + Sync>>
+        ) -> Pin<Box<dyn Future<Output = Response<ResponseBody>> + Send + 'static + Sync>>
         + 'static
         + Send
         + Sync,
@@ -73,10 +73,10 @@ impl ProcessHandle {
 }
 pub struct ResponseActor {
     sink: FramedWrite<OwnedWriteHalf, ResponseEncoder>,
-    receiver: Receiver<Response<Vec<u8>>>,
+    receiver: Receiver<Response<ResponseBody>>,
 }
 impl ResponseActor {
-    pub fn new(sink: OwnedWriteHalf, receiver: Receiver<Response<Vec<u8>>>) -> Self {
+    pub fn new(sink: OwnedWriteHalf, receiver: Receiver<Response<ResponseBody>>) -> Self {
         let sink = FramedWrite::new(sink, ResponseEncoder::new());
         Self { sink, receiver }
     }
@@ -90,17 +90,17 @@ impl ResponseActor {
 }
 #[derive(Clone)]
 pub struct ResponseHandle {
-    sender: Sender<Response<Vec<u8>>>,
+    sender: Sender<Response<ResponseBody>>,
 }
 
 impl ResponseHandle {
-    pub fn new(sender: Sender<Response<Vec<u8>>>) -> Self {
+    pub fn new(sender: Sender<Response<ResponseBody>>) -> Self {
         Self { sender }
     }
     pub async fn send(
         &mut self,
-        res: Response<Vec<u8>>,
-    ) -> Result<(), SendError<Response<Vec<u8>>>> {
+        res: Response<ResponseBody>,
+    ) -> Result<(), SendError<Response<ResponseBody>>> {
         self.sender.send(res).await
     }
 }
