@@ -5,8 +5,8 @@ use http_server_async_czh::CzhServer;
 use log::info;
 use tokio::time;
 
-async fn hello(req: Request<String>) -> Response<String> {
-    Response::new("body".to_string())
+async fn hello(req: Request<String>) -> Response<Vec<u8>> {
+    Response::new("body".as_bytes().to_vec())
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -22,7 +22,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     "content-length",
                     HeaderValue::from_str(&res.as_bytes().len().to_string()).unwrap(),
                 )
-                .body(res)
+                .body(res.as_bytes().to_vec())
                 .unwrap()
         })
         .post("/a", hello)

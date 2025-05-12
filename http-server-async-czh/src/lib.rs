@@ -73,7 +73,7 @@ impl CzhServerBuilder {
     pub fn post<T, F>(mut self, path: &'static str, f: T) -> Self
     where
         T: 'static + Fn(Request<String>) -> F + Send + Sync,
-        F: Future<Output = Response<String>> + 'static + Send + Sync,
+        F: Future<Output = Response<Vec<u8>>> + 'static + Send + Sync,
     {
         if let Some(e) = self.routes.get_mut(&Method::POST) {
             e.insert(path, Box::new(move |req| Box::pin(f(req))));

@@ -14,7 +14,7 @@ use crate::encoder::ResponseEncoder;
 pub type RouteHandler = Box<
     dyn Fn(
             Request<String>,
-        ) -> Pin<Box<dyn Future<Output = Response<String>> + Send + 'static + Sync>>
+        ) -> Pin<Box<dyn Future<Output = Response<Vec<u8>>> + Send + 'static + Sync>>
         + 'static
         + Send
         + Sync,
@@ -73,10 +73,10 @@ impl ProcessHandle {
 }
 pub struct ResponseActor {
     sink: FramedWrite<OwnedWriteHalf, ResponseEncoder>,
-    receiver: Receiver<Response<String>>,
+    receiver: Receiver<Response<Vec<u8>>>,
 }
 impl ResponseActor {
-    pub fn new(sink: OwnedWriteHalf, receiver: Receiver<Response<String>>) -> Self {
+    pub fn new(sink: OwnedWriteHalf, receiver: Receiver<Response<Vec<u8>>>) -> Self {
         let sink = FramedWrite::new(sink, ResponseEncoder::new());
         Self { sink, receiver }
     }
@@ -90,14 +90,17 @@ impl ResponseActor {
 }
 #[derive(Clone)]
 pub struct ResponseHandle {
-    sender: Sender<Response<String>>,
+    sender: Sender<Response<Vec<u8>>>,
 }
 
 impl ResponseHandle {
-    pub fn new(sender: Sender<Response<String>>) -> Self {
+    pub fn new(sender: Sender<Response<Vec<u8>>>) -> Self {
         Self { sender }
     }
-    pub async fn send(&mut self, res: Response<String>) -> Result<(), SendError<Response<String>>> {
+    pub async fn send(
+        &mut self,
+        res: Response<Vec<u8>>,
+    ) -> Result<(), SendError<Response<Vec<u8>>>> {
         self.sender.send(res).await
     }
 }

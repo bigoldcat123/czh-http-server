@@ -9,11 +9,11 @@ impl ResponseEncoder {
         Self {}
     }
 }
-impl Encoder<Response<String>> for ResponseEncoder {
+impl Encoder<Response<Vec<u8>>> for ResponseEncoder {
     type Error = io::Error;
     fn encode(
         &mut self,
-        item: Response<String>,
+        item: Response<Vec<u8>>,
         dst: &mut tokio_util::bytes::BytesMut,
     ) -> Result<(), Self::Error> {
         dst.extend_from_slice(
@@ -25,7 +25,7 @@ impl Encoder<Response<String>> for ResponseEncoder {
         // dst.extend_from_slice("Content-Length: 10\r\n".as_bytes());
         dst.extend_from_slice(b"\r\n");
         // dst.extend_from_slice("aaaaaaaaaa".as_bytes());
-        dst.extend_from_slice(item.body().as_bytes());
+        dst.extend_from_slice(item.body().as_slice());
         let e = std::str::from_utf8(&dst).unwrap();
         info!("send ok {:?}", e);
         Ok(())

@@ -19,7 +19,6 @@ impl Decoder for RequestDecoder {
         &mut self,
         src: &mut tokio_util::bytes::BytesMut,
     ) -> Result<Option<Self::Item>, Self::Error> {
-        info!("here!");
         let mut iter = src.iter().as_slice().split(|x| *x == b'\n');
         let mut header_line_len = 0;
         let mut body_len = 0;
