@@ -1,7 +1,10 @@
+use http::{HeaderValue, Response};
+
 #[test]
 fn test_function() {
-    let mut  a = "hello".as_bytes().iter().as_slice().split(|x| *x == b'\n');
-    let a = a.next();
-    println!("a{:?}",a);
-
+    let r = Response::builder()
+        .header("asd", HeaderValue::from_static("hello"))
+        .body("body")
+        .unwrap();
+    println!("{:?}", format!("{:?} {} {}", r.version(), r.status(), "ok"));
 }

@@ -46,10 +46,10 @@ impl ProcessActor {
                         info!("6. send response to response actor");
                         let _ = response_handle.send(res).await;
                     });
-                }else {
+                } else {
                     error!("no such puth");
                 }
-            }else {
+            } else {
                 error!("no such method");
             }
         }
@@ -84,7 +84,6 @@ impl ResponseActor {
     pub async fn run(mut self) {
         while let Some(n) = self.receiver.recv().await {
             info!("7. serialize response to sink");
-            info!("{:?}",n);
             let _ = self.sink.send(n).await;
         }
     }
