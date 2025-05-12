@@ -44,7 +44,7 @@ impl ProcessActor {
                         info!("5. exec routes handler");
                         let res = m(req).await;
                         info!("6. send response to response actor");
-                        let _ = response_handle.send(res).await;
+                        // let _ = response_handle.send(res).await;
                     });
                 }else {
                     error!("no such puth");
