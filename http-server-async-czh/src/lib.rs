@@ -99,7 +99,11 @@ impl CzhServerBuilder {
             + Sync,
     {
         if let Some(e) = self.guards.get_mut(&method) {
-            e.insert(path, Box::new(move |req| Box::pin(f(req))));
+            if let Some(v) = e.get_mut(path) {
+                v.push(Box::new(move |req| Box::pin(f(req))));
+            } else {
+                e.insert(path, vec![Box::new(move |req| Box::pin(f(req)))]);
+            }
             self
         } else {
             let new_map = HashMap::new();

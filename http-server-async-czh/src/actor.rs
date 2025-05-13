@@ -88,15 +88,18 @@ impl ProcessActor {
                     let mut req = Some(req);
                     for m in m.iter() {
                         let res = m(req.take().unwrap()).await;
-                        info!("6. send response to response actor");
+
                         if res.1.is_none() {
                             // Self::handle_req(res.0, response_handle, routes);
                             req = Some(res.0);
                         } else {
+                            info!("6. send response to response actor");
                             let _ = response_handle.send(res.1.unwrap()).await;
+                            break;
                         }
                     }
                     if req.is_some() {
+                        info!("6. send response to response actor");
                         let res = e(req.take().unwrap()).await;
                         let _ = response_handle.send(res).await;
                     }

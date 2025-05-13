@@ -19,7 +19,10 @@ async fn hello(_: Request<String>) -> Response<ResponseBody> {
     ))
     .into()
 }
-
+async fn guard_hello1(req: Request<String>) -> (Request<String>, Option<Response<ResponseBody>>) {
+    info!("i am a guard!2222222");
+    (req, None)
+}
 async fn guard_hello(req: Request<String>) -> (Request<String>, Option<Response<ResponseBody>>) {
     info!("i am a guard!");
     (
@@ -49,6 +52,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();
     let _ = CzhServer::builder()
         .get("/", hello)
+        .guard_at(Method::GET, "/", guard_hello1)
         .guard_at(Method::GET, "/", guard_hello)
         .get("/stu", hello2)
         .build()
