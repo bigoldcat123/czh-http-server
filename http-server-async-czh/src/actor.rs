@@ -35,10 +35,10 @@ pub type RouteGuard = Box<
         + Sync,
 >;
 pub type Routes = HashMap<Method, HashMap<&'static str, RouteHandler>>;
-pub type Guards = HashMap<Method, HashMap<&'static str, RouteGuard>>;
+pub type Guards = HashMap<Method, HashMap<&'static str, Vec<RouteGuard>>>;
 
 pub type SharedRoutes = HashMap<Method, Arc<HashMap<&'static str, Arc<RouteHandler>>>>;
-pub type SharedGuards = HashMap<Method, Arc<HashMap<&'static str, Arc<RouteGuard>>>>;
+pub type SharedGuards = HashMap<Method, Arc<HashMap<&'static str, Arc<Vec<RouteGuard>>>>>;
 
 pub struct ProcessActor {
     routes: SharedRoutes,
@@ -85,14 +85,20 @@ impl ProcessActor {
 
                 tokio::spawn(async move {
                     info!("5. exec routes handler");
-                    let res = m(req).await;
-                    info!("6. send response to response actor");
-                    if res.1.is_none() {
-                        // Self::handle_req(res.0, response_handle, routes);
-                        let res = e(res.0).await;
+                    let mut req = Some(req);
+                    for m in m.iter() {
+                        let res = m(req.take().unwrap()).await;
+                        info!("6. send response to response actor");
+                        if res.1.is_none() {
+                            // Self::handle_req(res.0, response_handle, routes);
+                            req = Some(res.0);
+                        } else {
+                            let _ = response_handle.send(res.1.unwrap()).await;
+                        }
+                    }
+                    if req.is_some() {
+                        let res = e(req.take().unwrap()).await;
                         let _ = response_handle.send(res).await;
-                    } else {
-                        let _ = response_handle.send(res.1.unwrap()).await;
                     }
                 });
             } else {
