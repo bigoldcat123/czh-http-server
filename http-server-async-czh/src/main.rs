@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::path::PathBuf;
 
-use http::{Method, Request, Response, method};
+use http::{Method, Request, Response};
 use http_server_async_czh::CzhServer;
 use http_server_async_czh::body_type::ResponseBody::{self, File, Json};
 use log::info;
