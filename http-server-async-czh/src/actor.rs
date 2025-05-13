@@ -47,10 +47,10 @@ impl ProcessActor {
                         let _ = response_handle.send(res).await;
                     });
                 } else {
-                    error!("no such puth");
+                    error!("no such puth {}",req.uri().path());
                 }
             } else {
-                error!("no such method");
+                error!("no such method {}",req.method());
             }
         }
     }
@@ -86,6 +86,7 @@ impl ResponseActor {
             info!("7. serialize response to sink");
             let _ = self.sink.send(n).await;
         }
+        info!("response actor is out~");
     }
 }
 #[derive(Clone)]

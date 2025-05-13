@@ -1,8 +1,6 @@
 use std::{collections::HashMap, error::Error, sync::Arc};
 
-use actor::{
-    ProcessActor, ProcessHandle, ResponseActor, ResponseHandle, RouteHandler, Routes, SharedRoutes,
-};
+use actor::{ProcessActor, ProcessHandle, ResponseActor, ResponseHandle, Routes, SharedRoutes};
 use body_type::ResponseBody;
 use decoder::RequestDecoder;
 use futures::StreamExt;
@@ -13,9 +11,9 @@ use tokio_util::codec::FramedRead;
 
 pub mod actor;
 
+pub mod body_type;
 pub mod decoder;
 pub mod encoder;
-pub mod body_type;
 
 pub struct CzhServer {
     process_actor: ProcessActor,
@@ -62,6 +60,7 @@ impl CzhServer {
                     info!("3. parse stream to req instanse");
                     let _ = process_handle.send((next, response_handle.clone())).await;
                 }
+                info!("connection over~!!!!!");
             });
         }
         Ok(())
@@ -72,30 +71,46 @@ pub struct CzhServerBuilder {
     routes: Routes,
 }
 impl CzhServerBuilder {
+    fn insert_route_hadnler<T, F>(&mut self, method: Method, path: &'static str, f: T)
+    where
+        T: 'static + Fn(Request<String>) -> F + Send + Sync,
+        F: Future<Output = Response<ResponseBody>> + 'static + Send + Sync,
+    {
+        if let Some(e) = self.routes.get_mut(&method) {
+            e.insert(path, Box::new(move |req| Box::pin(f(req))));
+        } else {
+            let new_map = HashMap::new();
+            self.routes.insert(method.clone(), new_map);
+            self.insert_route_hadnler(method, path, f);
+        }
+    }
+
     pub fn post<T, F>(mut self, path: &'static str, f: T) -> Self
     where
         T: 'static + Fn(Request<String>) -> F + Send + Sync,
         F: Future<Output = Response<ResponseBody>> + 'static + Send + Sync,
     {
-        if let Some(e) = self.routes.get_mut(&Method::POST) {
-            e.insert(path, Box::new(move |req| Box::pin(f(req))));
-        } else {
-            let new_map = HashMap::new();
-            self.routes.insert(Method::POST, new_map);
-            return self.post(path, f);
-        }
+        self.insert_route_hadnler(Method::POST, path, f);
         self
     }
-    pub fn posts(self, vk: Vec<(&'static str, RouteHandler)>) -> Self {
-        let mut other = self;
-        for (v, k) in vk {
-            if let Some(e) = other.routes.get_mut(&Method::POST) {
-                e.insert(v, Box::new(move |req| k(req)));
-            }
-            other = other;
-        }
-        other
+    pub fn get<T, F>(mut self, path: &'static str, f: T) -> Self
+    where
+        T: 'static + Fn(Request<String>) -> F + Send + Sync,
+        F: Future<Output = Response<ResponseBody>> + 'static + Send + Sync,
+    {
+        self.insert_route_hadnler(Method::GET, path, f);
+        self
     }
+    // pub fn posts(self, vk: Vec<(&'static str, RouteHandler)>) -> Self {
+    //     let mut other = self;
+    //     for (v, k) in vk {
+    //         if let Some(e) = other.routes.get_mut(&Method::POST) {
+    //             e.insert(v, Box::new(move |req| k(req)));
+    //         }
+    //         other = other;
+    //     }
+    //     other
+    // }
     pub fn build(self) -> CzhServer {
         let (process_sender, process_reciver) = tokio::sync::mpsc::channel(10);
         CzhServer {

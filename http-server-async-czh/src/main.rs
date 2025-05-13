@@ -1,32 +1,34 @@
-use std::{error::Error, time::Duration};
+use std::error::Error;
+use std::path::PathBuf;
 
-use http::{HeaderValue, Request, Response};
+use http::{Request, Response};
 use http_server_async_czh::CzhServer;
-use http_server_async_czh::body_type::ResponseBody;
-use log::info;
-use tokio::time;
+use http_server_async_czh::body_type::ResponseBody::{self, File, Json, Text};
+use serde::{Deserialize, Serialize};
 
-async fn hello(_: Request<String>) -> Response<ResponseBody> {
-    Response::new(ResponseBody::Text("body".as_bytes().to_vec()))
+#[derive(Serialize, Deserialize)]
+struct Student {
+    name: String,
+    age: u16,
 }
 
+async fn hello(_: Request<String>) -> Response<ResponseBody> {
+    File(PathBuf::from("/Users/dadigua/Desktop/czh-http-server/http-server-async-czh/src/main.rs")).into()
+}
+async fn hello2(_: Request<String>) -> Response<ResponseBody> {
+    let s = Student {
+        name: String::from("hello"),
+        age: 18,
+    };
+    let s = serde_json::to_vec(&s).unwrap();
+    Json(s).into()
+}
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();
     let _ = CzhServer::builder()
-        .post("/", async |_| {
-            info!("i am executed");
-            time::sleep(Duration::from_secs(3)).await;
-            let res = "hello".to_string();
-            Response::builder()
-                // .header(
-                //     "content-length",
-                //     HeaderValue::from_str(&res.as_bytes().len().to_string()).unwrap(),
-                // )
-                .body(ResponseBody::Text(res.as_bytes().to_vec()))
-                .unwrap()
-        })
-        .post("/a", hello)
+        .get("/", hello)
+        .get("/stu", hello2)
         .build()
         .start()
         .await;
