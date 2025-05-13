@@ -19,7 +19,7 @@ impl Encoder<Response<ResponseBody>> for ResponseEncoder {
     fn encode(
         &mut self,
         item: Response<ResponseBody>,
-        mut dst: &mut tokio_util::bytes::BytesMut,
+        dst: &mut tokio_util::bytes::BytesMut,
     ) -> Result<(), Self::Error> {
         let content_len;
         dst.extend_from_slice(
@@ -37,9 +37,6 @@ impl Encoder<Response<ResponseBody>> for ResponseEncoder {
             ResponseBody::File(path) => {
                 let f = File::open(path).unwrap();
                 content_len = f.metadata().unwrap().len() as usize;
-            }
-            _ => {
-                unimplemented!()
             }
         }
 
@@ -75,9 +72,6 @@ impl Encoder<Response<ResponseBody>> for ResponseEncoder {
                     }
                     dst.extend_from_slice(&buf[0..r]);
                 }
-            }
-            _ => {
-                unimplemented!()
             }
         }
         let e = std::str::from_utf8(&dst).unwrap();

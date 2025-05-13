@@ -1,6 +1,9 @@
 use std::{collections::HashMap, error::Error, sync::Arc};
 
-use actor::{ProcessActor, ProcessHandle, ResponseActor, ResponseHandle, Routes, SharedRoutes};
+use actor::{
+    Guards, ProcessActor, ProcessHandle, ResponseActor, ResponseHandle, Routes, SharedGuards,
+    SharedRoutes,
+};
 use body_type::ResponseBody;
 use decoder::RequestDecoder;
 use futures::StreamExt;
@@ -24,6 +27,7 @@ impl CzhServer {
     pub fn builder() -> CzhServerBuilder {
         CzhServerBuilder {
             routes: HashMap::new(),
+            guards: HashMap::new(),
         }
     }
 
@@ -69,6 +73,7 @@ impl CzhServer {
 
 pub struct CzhServerBuilder {
     routes: Routes,
+    guards: Guards,
 }
 impl CzhServerBuilder {
     fn insert_route_hadnler<T, F>(&mut self, method: Method, path: &'static str, f: T)
@@ -82,6 +87,24 @@ impl CzhServerBuilder {
             let new_map = HashMap::new();
             self.routes.insert(method.clone(), new_map);
             self.insert_route_hadnler(method, path, f);
+        }
+    }
+
+    pub fn guard_at<T, F>(mut self, method: Method, path: &'static str, f: T) -> Self
+    where
+        T: 'static + Fn(Request<String>) -> F + Send + Sync,
+        F: Future<Output = (Request<String>, Option<Response<ResponseBody>>)>
+            + 'static
+            + Send
+            + Sync,
+    {
+        if let Some(e) = self.guards.get_mut(&method) {
+            e.insert(path, Box::new(move |req| Box::pin(f(req))));
+            self
+        } else {
+            let new_map = HashMap::new();
+            self.guards.insert(method.clone(), new_map);
+            self.guard_at(method, path, f)
         }
     }
 
@@ -114,13 +137,30 @@ impl CzhServerBuilder {
     pub fn build(self) -> CzhServer {
         let (process_sender, process_reciver) = tokio::sync::mpsc::channel(10);
         CzhServer {
-            process_actor: ProcessActor::new(convert2shared(self.routes), process_reciver),
+            process_actor: ProcessActor::new(
+                convert2shared(self.routes),
+                convert2shared_guard(self.guards),
+                process_reciver,
+            ),
             process_handle: ProcessHandle::new(process_sender),
         }
     }
 }
 
 fn convert2shared(routes: Routes) -> SharedRoutes {
+    let mut res = HashMap::new();
+
+    routes.into_iter().for_each(|(k, v)| {
+        let mut new_map = HashMap::new();
+        v.into_iter().for_each(|(innder_k, inner_v)| {
+            new_map.insert(innder_k, Arc::new(inner_v));
+        });
+        res.insert(k, Arc::new(new_map));
+    });
+    res
+}
+
+fn convert2shared_guard(routes: Guards) -> SharedGuards {
     let mut res = HashMap::new();
 
     routes.into_iter().for_each(|(k, v)| {

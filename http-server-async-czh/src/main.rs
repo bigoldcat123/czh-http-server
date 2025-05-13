@@ -1,9 +1,10 @@
 use std::error::Error;
 use std::path::PathBuf;
 
-use http::{Request, Response};
+use http::{Method, Request, Response, method};
 use http_server_async_czh::CzhServer;
-use http_server_async_czh::body_type::ResponseBody::{self, File, Json, Text};
+use http_server_async_czh::body_type::ResponseBody::{self, File, Json};
+use log::info;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -13,7 +14,27 @@ struct Student {
 }
 
 async fn hello(_: Request<String>) -> Response<ResponseBody> {
-    File(PathBuf::from("/Users/dadigua/Desktop/czh-http-server/http-server-async-czh/src/main.rs")).into()
+    File(PathBuf::from(
+        "/Users/dadigua/Desktop/czh-http-server/http-server-async-czh/src/main.rs",
+    ))
+    .into()
+}
+
+async fn guard_hello(req: Request<String>) -> (Request<String>, Option<Response<ResponseBody>>) {
+    info!("i am a guard!");
+    (
+        req,
+        Some(
+            Json(
+                serde_json::to_vec(&Student {
+                    name: String::from("you are not allowed!"),
+                    age: 12,
+                })
+                .unwrap(),
+            )
+            .into(),
+        ),
+    )
 }
 async fn hello2(_: Request<String>) -> Response<ResponseBody> {
     let s = Student {
@@ -28,6 +49,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();
     let _ = CzhServer::builder()
         .get("/", hello)
+        .guard_at(Method::GET, "/", guard_hello)
         .get("/stu", hello2)
         .build()
         .start()
