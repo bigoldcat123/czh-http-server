@@ -1,7 +1,7 @@
 use std::{collections::HashMap, pin::Pin, sync::Arc};
 
 use futures::SinkExt;
-use http::{Method, Request, Response};
+use http::{Method, Request, Response, StatusCode};
 use log::{error, info};
 use tokio::{
     net::tcp::OwnedWriteHalf,
@@ -9,7 +9,7 @@ use tokio::{
 };
 use tokio_util::codec::FramedWrite;
 
-use crate::{body_type::ResponseBody, encoder::ResponseEncoder};
+use crate::{body_type::ResponseBody, encoder::ResponseEncoder, into_responses::IntoResponse};
 
 pub type RouteHandler = Box<
     dyn Fn(
@@ -112,7 +112,11 @@ impl ProcessActor {
         }
     }
 
-    fn handle_req(req: Request<String>, response_handle: ResponseHandle, routes: &SharedRoutes) {
+    fn handle_req(
+        req: Request<String>,
+        mut response_handle: ResponseHandle,
+        routes: &SharedRoutes,
+    ) {
         if let Some(e) = routes.get(req.method()) {
             if let Some(m) = Arc::clone(e).get(req.uri().path()) {
                 let m = Arc::clone(m);
@@ -125,9 +129,27 @@ impl ProcessActor {
                 });
             } else {
                 error!("no such puth {}", req.uri().path());
+                tokio::spawn(async move {
+                    response_handle
+                        .send({
+                            let mut res = "not found!".into_response();
+                            *res.status_mut() = StatusCode::NOT_FOUND;
+                            res
+                        })
+                        .await
+                });
             }
         } else {
             error!("no such method {}", req.method());
+            tokio::spawn(async move {
+                response_handle
+                    .send({
+                        let mut res = "method not supported !!".into_response();
+                        *res.status_mut() = StatusCode::NOT_FOUND;
+                        res
+                    })
+                    .await
+            });
         }
     }
 }
