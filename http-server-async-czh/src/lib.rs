@@ -4,10 +4,10 @@ use actor::{
     Guards, ProcessActor, ProcessHandle, ResponseActor, ResponseHandle, Routes, SharedGuards,
     SharedRoutes,
 };
-use body_type::ResponseBody;
 use decoder::RequestDecoder;
 use futures::StreamExt;
-use http::{Method, Request, Response};
+use http::{Method, Request};
+use into_responses::IntoResponse;
 use log::info;
 use tokio::net::TcpListener;
 use tokio_util::codec::FramedRead;
@@ -17,6 +17,7 @@ pub mod actor;
 pub mod body_type;
 pub mod decoder;
 pub mod encoder;
+pub mod into_responses;
 
 pub struct CzhServer {
     process_actor: ProcessActor,
@@ -76,13 +77,17 @@ pub struct CzhServerBuilder {
     guards: Guards,
 }
 impl CzhServerBuilder {
-    fn insert_route_hadnler<T, F>(&mut self, method: Method, path: &'static str, f: T)
+    fn insert_route_hadnler<T, F, O>(&mut self, method: Method, path: &'static str, f: T)
     where
-        T: 'static + Fn(Request<String>) -> F + Send + Sync,
-        F: Future<Output = Response<ResponseBody>> + 'static + Send + Sync,
+        T: 'static + Copy + Fn(Request<String>) -> F + Send + Sync,
+        F: Future<Output = O> + 'static + Send + Sync,
+        O: IntoResponse,
     {
         if let Some(e) = self.routes.get_mut(&method) {
-            e.insert(path, Box::new(move |req| Box::pin(f(req))));
+            e.insert(
+                path,
+                Box::new(move |req| Box::pin(async move { f(req).await.into_response() })),
+            );
         } else {
             let new_map = HashMap::new();
             self.routes.insert(method.clone(), new_map);
@@ -90,19 +95,27 @@ impl CzhServerBuilder {
         }
     }
 
-    pub fn guard_at<T, F>(mut self, method: Method, path: &'static str, f: T) -> Self
+    pub fn guard_at<T, F, O>(mut self, method: Method, path: &'static str, f: T) -> Self
     where
-        T: 'static + Fn(Request<String>) -> F + Send + Sync,
-        F: Future<Output = (Request<String>, Option<Response<ResponseBody>>)>
-            + 'static
-            + Send
-            + Sync,
+        T: 'static + Copy + Fn(Request<String>) -> F + Send + Sync,
+        F: Future<Output = (Request<String>, Option<O>)> + 'static + Send + Sync,
+        O: IntoResponse,
     {
         if let Some(e) = self.guards.get_mut(&method) {
             if let Some(v) = e.get_mut(path) {
-                v.push(Box::new(move |req| Box::pin(f(req))));
+                v.push(Box::new(move |req| {
+                    Box::pin(async move {
+                        let x = f(req).await;
+                        if x.1.is_none() {
+                            (x.0, None)
+                        } else {
+                            (x.0, Some(x.1.unwrap().into_response()))
+                        }
+                    })
+                }));
             } else {
-                e.insert(path, vec![Box::new(move |req| Box::pin(f(req)))]);
+                e.insert(path, vec![]);
+                return self.guard_at(method, path, f);
             }
             self
         } else {
@@ -114,16 +127,18 @@ impl CzhServerBuilder {
 
     pub fn post<T, F>(mut self, path: &'static str, f: T) -> Self
     where
-        T: 'static + Fn(Request<String>) -> F + Send + Sync,
-        F: Future<Output = Response<ResponseBody>> + 'static + Send + Sync,
+        T: 'static + Fn(Request<String>) -> F + Send + Sync + Copy,
+        F: Future + 'static + Send + Sync,
+        F::Output: IntoResponse,
     {
         self.insert_route_hadnler(Method::POST, path, f);
         self
     }
     pub fn get<T, F>(mut self, path: &'static str, f: T) -> Self
     where
-        T: 'static + Fn(Request<String>) -> F + Send + Sync,
-        F: Future<Output = Response<ResponseBody>> + 'static + Send + Sync,
+        T: 'static + Fn(Request<String>) -> F + Send + Sync + Copy,
+        F: Future + 'static + Send + Sync,
+        F::Output: IntoResponse,
     {
         self.insert_route_hadnler(Method::GET, path, f);
         self
