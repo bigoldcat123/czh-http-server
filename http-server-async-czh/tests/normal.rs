@@ -3,6 +3,7 @@ use std::{
     path::{self, Path},
 };
 
+use http::Uri;
 use http_server_async_czh::body_type::JsonBody;
 use serde::{Deserialize, Serialize};
 
@@ -21,4 +22,5 @@ fn test_function() {
     let j = JsonBody::new(s);
     let a:A = j.data();
     println!("{:?}",a.name);
+    
 }
