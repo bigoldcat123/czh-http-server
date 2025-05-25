@@ -1,4 +1,4 @@
-use std::{collections::HashMap, error::Error, sync::Arc};
+use std::{collections::HashMap, error::Error, process, sync::Arc};
 
 use actor::{
     Guards, ProcessActor, ProcessHandle, ResponseActor, ResponseHandle, Routes, SharedGuards,
@@ -8,7 +8,7 @@ use decoder::RequestDecoder;
 use futures::StreamExt;
 use http::{Method, Request};
 use into_responses::IntoResponse;
-use log::info;
+use log::{error, info};
 use tokio::net::TcpListener;
 use tokio_util::codec::FramedRead;
 
@@ -19,6 +19,7 @@ pub mod decoder;
 pub mod encoder;
 pub mod into_responses;
 
+/// ## run *ProcessActor* and send req to it by *ProcessHandle*
 pub struct CzhServer {
     process_actor: ProcessActor,
     process_handle: ProcessHandle,
@@ -47,6 +48,7 @@ impl CzhServer {
     }
     async fn start_server(process_handle: ProcessHandle) -> Result<(), Box<dyn Error>> {
         let server = TcpListener::bind("localhost:7788").await?;
+        info!("start at localhost:7788");
         while let Ok((client, _)) = server.accept().await {
             info!("1. received req");
             let mut process_handle = process_handle.clone();
@@ -95,12 +97,28 @@ impl CzhServerBuilder {
         }
     }
 
+    fn routes_exists(&self, method: &Method, path: &'static str) -> bool {
+        if let Some(e) = self.routes.get(method) {
+            if let Some(_) = e.get(path) {
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        }
+    }
+
     pub fn guard_at<T, F, O>(mut self, method: Method, path: &'static str, f: T) -> Self
     where
         T: 'static + Copy + Fn(Request<String>) -> F + Send + Sync,
         F: Future<Output = (Request<String>, Option<O>)> + 'static + Send + Sync,
         O: IntoResponse,
     {
+        if !self.routes_exists(&method, path) {
+            error!("guard must be added on an existed route!");
+            process::exit(1);
+        }
         if let Some(e) = self.guards.get_mut(&method) {
             if let Some(v) = e.get_mut(path) {
                 v.push(Box::new(move |req| {

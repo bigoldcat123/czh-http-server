@@ -40,6 +40,8 @@ pub type Guards = HashMap<Method, HashMap<&'static str, Vec<RouteGuard>>>;
 pub type SharedRoutes = HashMap<Method, Arc<HashMap<&'static str, Arc<RouteHandler>>>>;
 pub type SharedGuards = HashMap<Method, Arc<HashMap<&'static str, Arc<Vec<RouteGuard>>>>>;
 
+/// ## response to process request
+/// receive request from handle, and execute it
 pub struct ProcessActor {
     routes: SharedRoutes,
     routes_guards: SharedGuards,
@@ -93,7 +95,7 @@ impl ProcessActor {
                             // Self::handle_req(res.0, response_handle, routes);
                             req = Some(res.0);
                         } else {
-                            info!("6. send response to response actor");
+                            info!("6. send response to response actor guard worked!");
                             let _ = response_handle.send(res.1.unwrap()).await;
                             break;
                         }
@@ -128,7 +130,7 @@ impl ProcessActor {
                     let _ = response_handle.send(res).await;
                 });
             } else {
-                error!("no such puth {}", req.uri().path());
+                error!("no such path {}", req.uri().path());
                 tokio::spawn(async move {
                     response_handle
                         .send({
@@ -169,6 +171,8 @@ impl ProcessHandle {
         Ok(())
     }
 }
+
+/// ## receive response and send it to sink
 pub struct ResponseActor {
     sink: FramedWrite<OwnedWriteHalf, ResponseEncoder>,
     receiver: Receiver<Response<ResponseBody>>,
@@ -187,6 +191,8 @@ impl ResponseActor {
         info!("response actor is out~");
     }
 }
+
+/// used to send response to **ResponseActor**
 #[derive(Clone)]
 pub struct ResponseHandle {
     sender: Sender<Response<ResponseBody>>,

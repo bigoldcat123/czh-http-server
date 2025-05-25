@@ -20,23 +20,10 @@ async fn hello(_: Request<String>) -> ResponseBody {
 }
 async fn guard_hello1(req: Request<String>) -> (Request<String>, Option<String>) {
     info!("i am a guard!2222222");
-    (req, None)
+    (req, Some("(oh no)".to_string()))
 }
 async fn guard_hello(req: Request<String>) -> (Request<String>, Option<String>) {
     info!("i am a guard!");
-    // (
-    //     req,
-    //     Some(
-    //         Json(
-    //             serde_json::to_vec(&Student {
-    //                 name: String::from("you are not allowed!"),
-    //                 age: 12,
-    //             })
-    //             .unwrap(),
-    //         )
-    //         .into(),
-    //     ),
-    // )
     (req, None)
 }
 async fn hello2(_: Request<String>) -> ResponseBody {
