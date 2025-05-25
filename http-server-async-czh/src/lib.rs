@@ -4,6 +4,7 @@ use actor::{
     Guards, ProcessActor, ProcessHandle, ResponseActor, ResponseHandle, Routes, SharedGuards,
     SharedRoutes,
 };
+use body_type::RequestBody;
 use decoder::RequestDecoder;
 use futures::StreamExt;
 use http::{Method, Request};
@@ -81,7 +82,7 @@ pub struct CzhServerBuilder {
 impl CzhServerBuilder {
     fn insert_route_hadnler<T, F, O>(&mut self, method: Method, path: &'static str, f: T)
     where
-        T: 'static + Copy + Fn(Request<String>) -> F + Send + Sync,
+        T: 'static + Copy + Fn(Request<RequestBody>) -> F + Send + Sync,
         F: Future<Output = O> + 'static + Send + Sync,
         O: IntoResponse,
     {
@@ -111,8 +112,8 @@ impl CzhServerBuilder {
 
     pub fn guard_at<T, F, O>(mut self, method: Method, path: &'static str, f: T) -> Self
     where
-        T: 'static + Copy + Fn(Request<String>) -> F + Send + Sync,
-        F: Future<Output = (Request<String>, Option<O>)> + 'static + Send + Sync,
+        T: 'static + Copy + Fn(Request<RequestBody>) -> F + Send + Sync,
+        F: Future<Output = (Request<RequestBody>, Option<O>)> + 'static + Send + Sync,
         O: IntoResponse,
     {
         if !self.routes_exists(&method, path) {
@@ -145,7 +146,7 @@ impl CzhServerBuilder {
 
     pub fn post<T, F>(mut self, path: &'static str, f: T) -> Self
     where
-        T: 'static + Fn(Request<String>) -> F + Send + Sync + Copy,
+        T: 'static + Fn(Request<RequestBody>) -> F + Send + Sync + Copy,
         F: Future + 'static + Send + Sync,
         F::Output: IntoResponse,
     {
@@ -154,7 +155,7 @@ impl CzhServerBuilder {
     }
     pub fn get<T, F>(mut self, path: &'static str, f: T) -> Self
     where
-        T: 'static + Fn(Request<String>) -> F + Send + Sync + Copy,
+        T: 'static + Fn(Request<RequestBody>) -> F + Send + Sync + Copy,
         F: Future + 'static + Send + Sync,
         F::Output: IntoResponse,
     {

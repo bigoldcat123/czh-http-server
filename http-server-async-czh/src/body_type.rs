@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 use http::Response;
 use serde::{Deserialize, Serialize};
@@ -32,8 +32,20 @@ impl JsonBody {
     }
 }
 
+
+
 pub enum RequestBody {
     File(File),
     Text(String),
     Json(JsonBody),
+    MultiPart()
+}
+
+enum Part {
+    File(PathBuf),
+    Text(String)
+}
+
+struct Multipart {
+    parts:HashMap<String,Part>
 }

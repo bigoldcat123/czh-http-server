@@ -22,5 +22,14 @@ fn test_function() {
     let j = JsonBody::new(s);
     let a:A = j.data();
     println!("{:?}",a.name);
+    enum AA{
+        B(i32),
+        C(String)
+    }
+    let a = AA::B(2);
+    if let AA::B(x) = a {
+        
+    }
+
     
 }

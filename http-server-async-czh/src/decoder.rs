@@ -4,6 +4,8 @@ use http::{HeaderName, HeaderValue, Request};
 use log::info;
 use tokio_util::{bytes::Buf, codec::Decoder};
 
+use crate::body_type::RequestBody;
+
 pub struct RequestDecoder {}
 impl RequestDecoder {
     pub(crate) fn new() -> Self {
@@ -13,7 +15,7 @@ impl RequestDecoder {
 
 impl Decoder for RequestDecoder {
     type Error = io::Error;
-    type Item = Request<String>;
+    type Item = Request<RequestBody>;
     fn decode(
         &mut self,
         src: &mut tokio_util::bytes::BytesMut,
@@ -80,7 +82,10 @@ impl Decoder for RequestDecoder {
         info!("{:?} {}", header_line_len, body_len);
         if header_line_len + body_len <= src.len() {
             src.advance(header_line_len + body_len);
-            Ok(Some(req.body("body".to_string()).unwrap()))
+            
+            Ok(Some(
+                req.body(RequestBody::Text("body".to_string())).unwrap(),
+            ))
         } else {
             Ok(None)
         }

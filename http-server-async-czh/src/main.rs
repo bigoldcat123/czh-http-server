@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 use http::{Method, Request};
 use http_server_async_czh::CzhServer;
+use http_server_async_czh::body_type::RequestBody;
 use http_server_async_czh::body_type::ResponseBody::{self, File, Json};
 use log::info;
 use serde::{Deserialize, Serialize};
@@ -13,20 +14,20 @@ struct Student {
     age: u16,
 }
 
-async fn hello(_: Request<String>) -> ResponseBody {
+async fn hello(_: Request<RequestBody>) -> ResponseBody {
     File(PathBuf::from(
         "/Users/dadigua/Desktop/czh-http-server/http-server-async-czh/src/main.rs",
     ))
 }
-async fn guard_hello1(req: Request<String>) -> (Request<String>, Option<String>) {
+async fn guard_hello1(req: Request<RequestBody>) -> (Request<RequestBody>, Option<String>) {
     info!("i am a guard!2222222");
     (req, Some("(oh no)".to_string()))
 }
-async fn guard_hello(req: Request<String>) -> (Request<String>, Option<String>) {
+async fn guard_hello(req: Request<RequestBody>) -> (Request<RequestBody>, Option<String>) {
     info!("i am a guard!");
     (req, None)
 }
-async fn hello2(_: Request<String>) -> ResponseBody {
+async fn hello2(_: Request<RequestBody>) -> ResponseBody {
     let s = Student {
         name: String::from("hello"),
         age: 18,

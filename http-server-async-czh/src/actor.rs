@@ -9,11 +9,11 @@ use tokio::{
 };
 use tokio_util::codec::FramedWrite;
 
-use crate::{body_type::ResponseBody, encoder::ResponseEncoder, into_responses::IntoResponse};
+use crate::{body_type::{RequestBody, ResponseBody}, encoder::ResponseEncoder, into_responses::IntoResponse};
 
 pub type RouteHandler = Box<
     dyn Fn(
-            Request<String>,
+            Request<RequestBody>,
         ) -> Pin<Box<dyn Future<Output = Response<ResponseBody>> + Send + 'static + Sync>>
         + 'static
         + Send
@@ -21,10 +21,10 @@ pub type RouteHandler = Box<
 >;
 pub type RouteGuard = Box<
     dyn Fn(
-            Request<String>,
+            Request<RequestBody>,
         ) -> Pin<
             Box<
-                dyn Future<Output = (Request<String>, Option<Response<ResponseBody>>)>
+                dyn Future<Output = (Request<RequestBody>, Option<Response<ResponseBody>>)>
                     + Send
                     + 'static
                     + Sync,
@@ -45,13 +45,13 @@ pub type SharedGuards = HashMap<Method, Arc<HashMap<&'static str, Arc<Vec<RouteG
 pub struct ProcessActor {
     routes: SharedRoutes,
     routes_guards: SharedGuards,
-    receiver: Receiver<(Request<String>, ResponseHandle)>,
+    receiver: Receiver<(Request<RequestBody>, ResponseHandle)>,
 }
 impl ProcessActor {
     pub fn new(
         routes: SharedRoutes,
         guards: SharedGuards,
-        receiver: Receiver<(Request<String>, ResponseHandle)>,
+        receiver: Receiver<(Request<RequestBody>, ResponseHandle)>,
     ) -> Self {
         Self {
             receiver,
@@ -67,7 +67,7 @@ impl ProcessActor {
     }
 
     fn guard(
-        req: Request<String>,
+        req: Request<RequestBody>,
         response_handle: ResponseHandle,
         routes: &SharedRoutes,
         guards: &SharedGuards,
@@ -115,7 +115,7 @@ impl ProcessActor {
     }
 
     fn handle_req(
-        req: Request<String>,
+        req: Request<RequestBody>,
         mut response_handle: ResponseHandle,
         routes: &SharedRoutes,
     ) {
@@ -157,16 +157,16 @@ impl ProcessActor {
 }
 #[derive(Clone)]
 pub struct ProcessHandle {
-    sender: Sender<(Request<String>, ResponseHandle)>,
+    sender: Sender<(Request<RequestBody>, ResponseHandle)>,
 }
 impl ProcessHandle {
-    pub fn new(sender: Sender<(Request<String>, ResponseHandle)>) -> Self {
+    pub fn new(sender: Sender<(Request<RequestBody>, ResponseHandle)>) -> Self {
         Self { sender }
     }
     pub async fn send(
         &mut self,
-        req: (Request<String>, ResponseHandle),
-    ) -> Result<(), SendError<(Request<String>, ResponseHandle)>> {
+        req: (Request<RequestBody>, ResponseHandle),
+    ) -> Result<(), SendError<(Request<RequestBody>, ResponseHandle)>> {
         self.sender.send(req).await?;
         Ok(())
     }
