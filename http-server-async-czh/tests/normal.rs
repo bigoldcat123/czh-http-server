@@ -1,25 +1,24 @@
+use std::{
+    fs::File,
+    path::{self, Path},
+};
+
+use http_server_async_czh::body_type::JsonBody;
+use serde::{Deserialize, Serialize};
 
 #[test]
 fn test_function() {
-    struct A {}
-    impl Into<String> for A {
-        fn into(self) -> String {
-            "as".to_string()
-        }
+    let a = Path::new("s");
+    #[derive(Serialize, Deserialize)]
+    struct A {
+        name: String,
     }
-
-    struct B {}
-    impl Into<String> for B {
-        fn into(self) -> String {
-            "asd".to_string()
-        }
-    }
-
-    fn do_something<T: Into<String>>(p: impl Fn() -> T) {
-        let e = p();
-        println!("e{:?}", e.into());
-    }
-
-    do_something(|| A {});
-    do_something(|| B {});
+    let a = A{
+        name:String::from("easd")
+    };
+    let s = serde_json::to_string(&a).unwrap();
+    println!("s{:?}",s);
+    let j = JsonBody::new(s);
+    let a:A = j.data();
+    println!("{:?}",a.name);
 }
